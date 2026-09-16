@@ -1,0 +1,46 @@
+/* Mobile performance and layout fixes. */
+html { -webkit-text-size-adjust: 100%; }
+body { min-width: 0; overscroll-behavior-x: none; }
+@media (max-width: 760px) {
+  :root { --navbar-h: 62px; }
+  .navbar-inner { width: calc(100% - 24px); gap: 8px; }
+  .navbar-links, .navbar-clock { display: none; }
+  .navbar-toggle { display: flex; flex: 0 0 44px; }
+  .navbar-brand { font-size: .95rem; }
+  .brand-logo { width: 34px; height: 34px; }
+  .hero { min-height: 100svh; padding: calc(var(--navbar-h) + 34px) 16px 70px; }
+  .hero-eyebrow { font-size: .62rem; letter-spacing: .12em; padding: 7px 11px; max-width: 100%; }
+  .hero-title .line-top { font-size: 1rem; letter-spacing: .18em; }
+  .hero-title .line-glow { font-size: clamp(2.25rem, 12vw, 4rem); }
+  .hero-actions { flex-direction: column; align-items: stretch; padding: 0 8px; }
+  .hero-actions .btn, .login-btn { width: 100%; min-height: 48px; }
+  .hero-float { display: none; }
+  .section { padding: 54px 0; }
+  .container { width: min(100% - 28px, 1200px); }
+  .section-head { margin-bottom: 30px; }
+  .features-grid, .feature-grid, .stats-grid, .info-strip { grid-template-columns: 1fr; gap: 14px; }
+  .info-strip { margin-top: -22px; }
+  .glass-card { padding: 20px 16px; border-radius: 16px; }
+  .page-header { padding: calc(var(--navbar-h) + 38px) 14px 28px; }
+  .page-header p { font-size: .92rem; }
+  .login-overlay { min-height: 100svh; padding: 18px 12px; overflow-y: auto; }
+  .login-stage { width: min(100%, 440px); }
+  .login-brand { margin-bottom: 18px; }
+  .login-school { font-size: .72rem; letter-spacing: .12em; }
+  .login-body { padding: 18px 14px; }
+  .login-modes { gap: 6px; }
+  .login-mode-chip { flex: 1; min-height: 44px; padding: 9px 8px; }
+  .login-field input { min-height: 50px; font-size: 16px; }
+  .login-foot { flex-wrap: wrap; gap: 8px; font-size: .68rem; }
+  .marquee-track { animation-duration: 46s; }
+  .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .quick-link { padding: 15px 10px; font-size: .82rem; }
+  .chat-app-header { flex-direction: column; align-items: stretch; gap: 12px; }
+  .chat-app-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .chat-app-actions button:last-child { grid-column: 1 / -1; }
+  input, select, textarea { max-width: 100%; }
+  .tabbar { padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
