@@ -1,0 +1,326 @@
+/* ============================================================
+   THEME SYSTEM — AIA Class 10-A Hub
+   The <html data-theme="..."> attribute switches themes.
+   Admin picks it in the Admin Panel → Theme tab.
+   Themes: glass (default) · luxury · simple · midnight ·
+           neon · sunset · ocean · royal
+   The inline script in each page <head> restores the saved
+   theme before paint (no flash).
+   ============================================================ */
+
+/* ---------- GLASS (default — current look) ---------- */
+:root, [data-theme="glass"] {
+  --bg: #070b16;
+  --bg-2: #0a0f1f;
+  --bg-3: #0d1428;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --glass: rgba(255, 255, 255, 0.055);
+  --glass-strong: rgba(20, 28, 52, 0.72);
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #eef2ff;
+  --text-secondary: #aab4d4;
+  --text-muted: #7d89ad;
+  --gold: #f5b544;
+  --gold-2: #ffd889;
+  --violet: #7c6cff;
+  --blue: #4f8cff;
+  --cyan: #38e0ff;
+  --green: #34d399;
+  --red: #ff5d7a;
+  --pink: #ff6ec7;
+  --grad-primary: linear-gradient(135deg, #7c6cff 0%, #4f8cff 50%, #38e0ff 100%);
+  --grad-gold: linear-gradient(135deg, #f5b544 0%, #ff8a3d 60%, #ffd889 100%);
+  --grad-fire: linear-gradient(135deg, #ff5d7a, #ff8a3d, #ffd889);
+  --shadow-card: 0 10px 40px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 60px rgba(124, 108, 255, 0.25);
+  --nav-bg: rgba(10, 15, 30, 0.78);
+}
+[data-theme="glass"] body::before {
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(124, 108, 255, 0.16), transparent 60%),
+    radial-gradient(800px 500px at -10% 30%, rgba(56, 224, 255, 0.09), transparent 60%),
+    radial-gradient(700px 700px at 50% 110%, rgba(79, 140, 255, 0.10), transparent 60%),
+    var(--bg);
+}
+
+/* ---------- LUXURY (deep black + gold) ---------- */
+[data-theme="luxury"] {
+  --bg: #0a0705;
+  --bg-2: #120c08;
+  --bg-3: #1a120b;
+  --surface: rgba(255, 215, 160, 0.05);
+  --surface-2: rgba(255, 215, 160, 0.08);
+  --glass: rgba(255, 215, 160, 0.06);
+  --glass-strong: rgba(18, 12, 8, 0.8);
+  --border: rgba(255, 200, 140, 0.13);
+  --border-strong: rgba(255, 200, 140, 0.26);
+  --text: #fdf3e3;
+  --text-secondary: #cfbda3;
+  --text-muted: #8f7d66;
+  --gold: #f0b24b;
+  --gold-2: #ffd98c;
+  --violet: #c9a24b;
+  --blue: #e0b45c;
+  --cyan: #f6d584;
+  --green: #d8b45a;
+  --red: #e07f4a;
+  --pink: #e8c07a;
+  --grad-primary: linear-gradient(135deg, #f0b24b 0%, #d99f3e 50%, #f6d584 100%);
+  --grad-gold: linear-gradient(135deg, #f0b24b 0%, #c98f3a 60%, #ffd98c 100%);
+  --grad-fire: linear-gradient(135deg, #e07f4a, #f0b24b, #ffd98c);
+  --shadow-card: 0 14px 44px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 60px rgba(240, 178, 75, 0.2);
+  --nav-bg: rgba(14, 9, 5, 0.82);
+}
+[data-theme="luxury"] body::before {
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(240, 178, 75, 0.13), transparent 60%),
+    radial-gradient(800px 500px at -10% 30%, rgba(200, 143, 58, 0.08), transparent 60%),
+    radial-gradient(700px 700px at 50% 110%, rgba(240, 178, 75, 0.07), transparent 60%),
+    var(--bg);
+}
+[data-theme="luxury"] .navbar.scrolled { background: var(--nav-bg); }
+[data-theme="luxury"] .brand-accent { background: var(--grad-gold); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* ---------- SIMPLE (clean light) ---------- */
+[data-theme="simple"] {
+  --bg: #f4f6fb;
+  --bg-2: #eef1f8;
+  --bg-3: #e8ecf6;
+  --surface: rgba(255, 255, 255, 0.75);
+  --surface-2: rgba(255, 255, 255, 0.9);
+  --glass: rgba(255, 255, 255, 0.82);
+  --glass-strong: rgba(255, 255, 255, 0.95);
+  --border: rgba(20, 30, 60, 0.1);
+  --border-strong: rgba(20, 30, 60, 0.2);
+  --text: #16203a;
+  --text-secondary: #41507a;
+  --text-muted: #6a78a3;
+  --gold: #d99a2b;
+  --gold-2: #e5b04a;
+  --violet: #6c5ce7;
+  --blue: #3b82f6;
+  --cyan: #0891b2;
+  --green: #0d9668;
+  --red: #e5484d;
+  --pink: #d63384;
+  --grad-primary: linear-gradient(135deg, #6c5ce7 0%, #3b82f6 50%, #0891b2 100%);
+  --grad-gold: linear-gradient(135deg, #d99a2b 0%, #e07b39 60%, #f0c04a 100%);
+  --grad-fire: linear-gradient(135deg, #e5484d, #e07b39, #f0c04a);
+  --shadow-card: 0 10px 34px rgba(30, 45, 90, 0.13);
+  --shadow-glow: 0 0 44px rgba(108, 92, 231, 0.14);
+  --nav-bg: rgba(244, 246, 251, 0.88);
+}
+[data-theme="simple"] body::before {
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(108, 92, 231, 0.1), transparent 60%),
+    radial-gradient(800px 500px at -10% 30%, rgba(8, 145, 178, 0.06), transparent 60%),
+    radial-gradient(700px 700px at 50% 110%, rgba(59, 130, 246, 0.08), transparent 60%),
+    var(--bg);
+}
+[data-theme="simple"] body::after {
+  background-image: radial-gradient(rgba(20, 30, 60, 0.05) 1px, transparent 1px);
+}
+[data-theme="simple"] .navbar.scrolled { background: var(--nav-bg); }
+[data-theme="simple"] .tabbar { background: rgba(255, 255, 255, 0.94); border-top-color: var(--border); }
+[data-theme="simple"] .login-overlay { background: var(--bg); }
+[data-theme="simple"] .stickman .sm-tag { color: #fff; }
+
+/* ---------- MIDNIGHT (deep navy, near-black) ---------- */
+[data-theme="midnight"] {
+  --bg: #020617;
+  --bg-2: #060d24;
+  --bg-3: #0b1530;
+  --surface: rgba(255, 255, 255, 0.038);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --glass: rgba(255, 255, 255, 0.045);
+  --glass-strong: rgba(6, 13, 36, 0.78);
+  --border: rgba(148, 197, 255, 0.1);
+  --border-strong: rgba(148, 197, 255, 0.2);
+  --text: #e8f0ff;
+  --text-secondary: #9fb4dd;
+  --text-muted: #6b81ab;
+  --gold: #5ea2ff;
+  --gold-2: #8fc3ff;
+  --violet: #5b8cff;
+  --blue: #3f7bff;
+  --cyan: #56c7ff;
+  --green: #3dd6c3;
+  --red: #ff6b7d;
+  --pink: #b38cff;
+  --grad-primary: linear-gradient(135deg, #5b8cff 0%, #3f7bff 50%, #56c7ff 100%);
+  --grad-gold: linear-gradient(135deg, #5ea2ff 0%, #7a6cff 60%, #8fc3ff 100%);
+  --grad-fire: linear-gradient(135deg, #ff6b7d, #8f6cff, #56c7ff);
+  --shadow-card: 0 12px 44px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 60px rgba(63, 123, 255, 0.28);
+  --nav-bg: rgba(3, 8, 22, 0.82);
+}
+[data-theme="midnight"] body::before {
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(63, 123, 255, 0.2), transparent 60%),
+    radial-gradient(800px 500px at -10% 30%, rgba(86, 199, 255, 0.09), transparent 60%),
+    radial-gradient(700px 700px at 50% 110%, rgba(120, 108, 255, 0.12), transparent 60%),
+    var(--bg);
+}
+[data-theme="midnight"] .navbar.scrolled { background: var(--nav-bg); }
+
+/* ---------- NEON (dark + electric) ---------- */
+[data-theme="neon"] {
+  --bg: #05030f;
+  --bg-2: #0b0720;
+  --bg-3: #130a2e;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --glass: rgba(24, 15, 60, 0.5);
+  --glass-strong: rgba(10, 5, 30, 0.8);
+  --border: rgba(0, 255, 220, 0.14);
+  --border-strong: rgba(0, 255, 220, 0.3);
+  --text: #f0fbff;
+  --text-secondary: #b3c9e8;
+  --text-muted: #7d8fb8;
+  --gold: #00ffd5;
+  --gold-2: #7dffef;
+  --violet: #a855f7;
+  --blue: #3b82f6;
+  --cyan: #00e5ff;
+  --green: #00ff88;
+  --red: #ff3860;
+  --pink: #ff2fd6;
+  --grad-primary: linear-gradient(135deg, #a855f7 0%, #3b82f6 50%, #00e5ff 100%);
+  --grad-gold: linear-gradient(135deg, #00ffd5 0%, #00e5ff 60%, #7dffef 100%);
+  --grad-fire: linear-gradient(135deg, #ff3860, #ff2fd6, #a855f7);
+  --shadow-card: 0 12px 44px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 60px rgba(0, 229, 255, 0.3);
+  --nav-bg: rgba(6, 3, 16, 0.84);
+}
+[data-theme="neon"] body::before {
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(168, 85, 247, 0.2), transparent 60%),
+    radial-gradient(800px 500px at -10% 30%, rgba(0, 229, 255, 0.12), transparent 60%),
+    radial-gradient(700px 700px at 50% 110%, rgba(255, 47, 214, 0.1), transparent 60%),
+    var(--bg);
+}
+[data-theme="neon"] .navbar.scrolled { background: var(--nav-bg); }
+[data-theme="neon"] .btn-primary { box-shadow: 0 0 26px rgba(0, 229, 255, 0.35); }
+
+/* ---------- SUNSET (warm dusk) ---------- */
+[data-theme="sunset"] {
+  --bg: #160a12;
+  --bg-2: #230f16;
+  --bg-3: #2e1320;
+  --surface: rgba(255, 190, 160, 0.05);
+  --surface-2: rgba(255, 190, 160, 0.08);
+  --glass: rgba(255, 170, 140, 0.055);
+  --glass-strong: rgba(30, 12, 18, 0.78);
+  --border: rgba(255, 170, 150, 0.12);
+  --border-strong: rgba(255, 170, 150, 0.24);
+  --text: #fff0ea;
+  --text-secondary: #d9b8ae;
+  --text-muted: #9d7f78;
+  --gold: #ffa04d;
+  --gold-2: #ffc98a;
+  --violet: #e86cff;
+  --blue: #ff8a5c;
+  --cyan: #ffab7a;
+  --green: #f5a35f;
+  --red: #ff5d7a;
+  --pink: #ff7ab8;
+  --grad-primary: linear-gradient(135deg, #ff7ab8 0%, #ff8a5c 50%, #ffab7a 100%);
+  --grad-gold: linear-gradient(135deg, #ffa04d 0%, #ff5d7a 60%, #ffc98a 100%);
+  --grad-fire: linear-gradient(135deg, #ff5d7a, #ff8a5c, #ffc98a);
+  --shadow-card: 0 12px 44px rgba(30, 8, 12, 0.5);
+  --shadow-glow: 0 0 60px rgba(255, 122, 184, 0.22);
+  --nav-bg: rgba(24, 10, 16, 0.82);
+}
+[data-theme="sunset"] body::before {
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(255, 122, 184, 0.17), transparent 60%),
+    radial-gradient(800px 500px at -10% 30%, rgba(255, 138, 92, 0.1), transparent 60%),
+    radial-gradient(700px 700px at 50% 110%, rgba(255, 90, 122, 0.08), transparent 60%),
+    var(--bg);
+}
+[data-theme="sunset"] .navbar.scrolled { background: var(--nav-bg); }
+
+/* ---------- OCEAN (deep blue-teal) ---------- */
+[data-theme="ocean"] {
+  --bg: #04121c;
+  --bg-2: #071c2b;
+  --bg-3: #0b2738;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-2: rgba(255, 255, 255, 0.065);
+  --glass: rgba(80, 220, 255, 0.05);
+  --glass-strong: rgba(6, 24, 38, 0.78);
+  --border: rgba(120, 220, 255, 0.11);
+  --border-strong: rgba(120, 220, 255, 0.22);
+  --text: #eafaff;
+  --text-secondary: #a8cddd;
+  --text-muted: #6f95a8;
+  --gold: #2dd4bf;
+  --gold-2: #5eead4;
+  --violet: #22d3ee;
+  --blue: #38bdf8;
+  --cyan: #2dd4bf;
+  --green: #34d399;
+  --red: #fb7185;
+  --pink: #f472b6;
+  --grad-primary: linear-gradient(135deg, #22d3ee 0%, #38bdf8 50%, #2dd4bf 100%);
+  --grad-gold: linear-gradient(135deg, #2dd4bf 0%, #38bdf8 60%, #5eead4 100%);
+  --grad-fire: linear-gradient(135deg, #fb7185, #38bdf8, #2dd4bf);
+  --shadow-card: 0 12px 44px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 60px rgba(34, 211, 238, 0.24);
+  --nav-bg: rgba(4, 16, 26, 0.82);
+}
+[data-theme="ocean"] body::before {
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(34, 211, 238, 0.16), transparent 60%),
+    radial-gradient(800px 500px at -10% 30%, rgba(56, 189, 248, 0.1), transparent 60%),
+    radial-gradient(700px 700px at 50% 110%, rgba(45, 212, 191, 0.09), transparent 60%),
+    var(--bg);
+}
+[data-theme="ocean"] .navbar.scrolled { background: var(--nav-bg); }
+
+/* ---------- ROYAL (purple crown) ---------- */
+[data-theme="royal"] {
+  --bg: #0d0717;
+  --bg-2: #170d29;
+  --bg-3: #1f1236;
+  --surface: rgba(255, 255, 255, 0.045);
+  --surface-2: rgba(255, 255, 255, 0.07);
+  --glass: rgba(160, 120, 255, 0.06);
+  --glass-strong: rgba(18, 10, 32, 0.8);
+  --border: rgba(190, 150, 255, 0.13);
+  --border-strong: rgba(190, 150, 255, 0.26);
+  --text: #f4eefe;
+  --text-secondary: #c7b4e4;
+  --text-muted: #8f7ab0;
+  --gold: #e9b44c;
+  --gold-2: #ffd98c;
+  --violet: #a78bfa;
+  --blue: #7c6cff;
+  --cyan: #b39dff;
+  --green: #9d7bff;
+  --red: #ff7ab8;
+  --pink: #e879f9;
+  --grad-primary: linear-gradient(135deg, #a78bfa 0%, #7c6cff 50%, #b39dff 100%);
+  --grad-gold: linear-gradient(135deg, #e9b44c 0%, #a78bfa 60%, #ffd98c 100%);
+  --grad-fire: linear-gradient(135deg, #ff7ab8, #a78bfa, #e9b44c);
+  --shadow-card: 0 14px 46px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 60px rgba(124, 108, 255, 0.3);
+  --nav-bg: rgba(15, 8, 26, 0.82);
+}
+[data-theme="royal"] body::before {
+  background:
+    radial-gradient(900px 600px at 85% -10%, rgba(167, 139, 250, 0.18), transparent 60%),
+    radial-gradient(800px 500px at -10% 30%, rgba(124, 108, 255, 0.11), transparent 60%),
+    radial-gradient(700px 700px at 50% 110%, rgba(233, 180, 76, 0.08), transparent 60%),
+    var(--bg);
+}
+[data-theme="royal"] .navbar.scrolled { background: var(--nav-bg); }
+
+/* keep nav + surfaces consistent in every theme */
+[data-theme] .navbar.scrolled { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+@media (prefers-reduced-motion: reduce) {
+  [data-theme] .navbar.scrolled { transition: none; }
+}

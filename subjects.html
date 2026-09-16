@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('aia_theme');
+        if (t && ['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) !== -1) {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIA Class 10-A Hub — Subject Hub</title>
+  <meta name="description" content="All 6 subjects: homework, notes, photos and resources for Class 10-A.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/stickmen.css">
+  <link rel="stylesheet" href="css/themes.css">
+
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+
+  <header class="page-header">
+    <div class="container">
+      <div class="page-icon"><i class="fa-solid fa-book-open"></i></div>
+      <h1 class="heading-lg text-gold reveal">Subject Hub</h1>
+      <p class="reveal reveal-delay-1">All six subjects — homework, notes, photos and resources in one place.</p>
+    </div>
+  </header>
+
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <!-- Subject filter pills -->
+      <div class="subject-pills reveal" id="subjectPills"></div>
+
+      <!-- Subject cards -->
+      <div class="subject-grid" id="subjectGrid"></div>
+
+      <!-- GitHub / online resources -->
+      <div class="section-head" data-reveal style="margin-top:44px">
+        <span class="eyebrow">From the web</span>
+        <h2 class="heading-md">GitHub Resources</h2>
+        <p class="text-secondary" style="font-size:.9rem">Extra study links fetched from a public JSON source (admin-configured).</p>
+      </div>
+      <div class="github-resources glass-card" id="githubResources" data-reveal>
+        <div class="text-muted" style="text-align:center;padding:18px"><i class="fa-solid fa-cloud-arrow-down"></i> Loading resources...</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Subject modal (photos + details) -->
+  <div class="modal-overlay" id="subjectModal">
+    <div class="modal-content">
+      <button class="modal-close" id="subjectModalClose"><i class="fa-solid fa-xmark"></i></button>
+      <div id="subjectModalContent"></div>
+    </div>
+  </div>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="data/seed.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/stickmen.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/subjects.js"></script>
+</body>
+</html>

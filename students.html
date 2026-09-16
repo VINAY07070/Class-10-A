@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('aia_theme');
+        if (t && ['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) !== -1) {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIA Class 10-A Hub — Students</title>
+  <meta name="description" content="Meet all 33 students of AIA Class 10-A with profiles, strengths, interests, and goals.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/stickmen.css">
+  <link rel="stylesheet" href="css/themes.css">
+
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div id="gate-placeholder"></div>
+
+  <header class="page-header">
+    <div class="container">
+      <div class="page-icon"><i class="fa-solid fa-graduation-cap"></i></div>
+      <h1 class="heading-lg text-gold reveal">Our Students</h1>
+      <p class="reveal reveal-delay-1">All 33 brilliant minds of Class 10-A. Click any name to open their profile.</p>
+    </div>
+  </header>
+
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <div class="search-container reveal">
+        <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <input type="text" id="studentSearch" class="search-input" placeholder="Search students..." autocomplete="off">
+        <span class="search-shortcut">/</span>
+      </div>
+      <div class="student-grid" id="studentGrid"></div>
+      <div id="studentsEmpty" class="empty-state" style="display:none">
+        <div class="empty-icon">🔭</div>
+        <p>No students match your search.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Section 10-B info card -->
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <div class="info-card transparent" id="info10B" data-reveal></div>
+    </div>
+  </section>
+
+  <!-- Student Modal -->
+  <div class="modal-overlay" id="studentModal">
+    <div class="modal-content">
+      <button class="modal-close" id="modalClose"><i class="fa-solid fa-xmark"></i></button>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="data/seed.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/stickmen.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/students.js"></script>
+</body>
+</html>

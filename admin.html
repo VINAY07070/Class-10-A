@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('aia_theme');
+        if (t && ['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) !== -1) {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIA Class 10-A Hub — Admin Panel</title>
+  <meta name="description" content="Class 10-A admin panel — manage content, users, AI bot, subjects and analytics.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/stickmen.css">
+  <link rel="stylesheet" href="css/themes.css">
+
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+
+  <header class="page-header">
+    <div class="container">
+      <div class="page-icon"><i class="fa-solid fa-gear"></i></div>
+      <h1 class="heading-lg text-gold reveal">Admin Panel</h1>
+      <p class="reveal reveal-delay-1">Analytics, content, AI brain, subjects, users and backup — all in one place.</p>
+    </div>
+  </header>
+
+  <section class="section" style="padding-top:0">
+    <div class="container">
+      <!-- Admin login -->
+      <div class="admin-login" id="adminLogin">
+        <div class="glass-card grad-border" style="text-align:center;max-width:480px;margin:0 auto">
+          <div style="font-size:2.5rem;margin-bottom:12px"><i class="fa-solid fa-lock" style="color:var(--gold)"></i></div>
+          <h3 class="heading-md">Owner Access</h3>
+          <p class="text-muted" style="font-size:0.85rem;margin:8px 0 22px">Enter the **full admin pass** for everything, or the visitor pass for read-only.</p>
+          <div class="login-input-group">
+            <input type="password" id="adminPassInput" placeholder="Admin passcode" autocomplete="off">
+            <button class="btn btn-primary" id="adminLoginBtn">Enter</button>
+          </div>
+          <div class="admin-login-extra" style="margin-top:18px">
+            <p class="text-muted" style="font-size:.8rem;margin-bottom:8px">…or sign in as owner student</p>
+            <div style="display:flex;flex-direction:column;gap:8px;max-width:300px;margin:0 auto">
+              <input type="text" id="adminOwnerUser" placeholder="admin_vinay / admin_nitin" autocomplete="off">
+              <input type="password" id="adminOwnerPass" placeholder="Owner password" autocomplete="off">
+              <button class="btn btn-secondary" id="adminOwnerLoginBtn">Login as owner</button>
+            </div>
+          </div>
+          <div id="adminLoginError" class="login-error" style="color:var(--red)"></div>
+        </div>
+      </div>
+
+      <!-- Admin app -->
+      <div id="adminApp" style="display:none">
+        <div class="admin-dashboard" id="adminDashboard"></div>
+        <div id="adminAuthBanner" class="admin-auth-banner"></div>
+
+        <div class="admin-tabs">
+          <button class="admin-tab" data-tab="homework"><i class="fa-solid fa-book-open"></i> Homework</button>
+          <button class="admin-tab" data-tab="scores"><i class="fa-solid fa-chart-column"></i> Scores</button>
+          <button class="admin-tab" data-tab="announce"><i class="fa-solid fa-bullhorn"></i> Announcements</button>
+          <button class="admin-tab" data-tab="polls"><i class="fa-solid fa-square-poll-vertical"></i> Polls</button>
+          <button class="admin-tab" data-tab="profiles"><i class="fa-solid fa-graduation-cap"></i> Profiles</button>
+          <button class="admin-tab" data-tab="subjects"><i class="fa-solid fa-book"></i> Subjects</button>
+          <button class="admin-tab" data-tab="aibot"><i class="fa-solid fa-robot"></i> AI Bot</button>
+          <button class="admin-tab" data-tab="activity"><i class="fa-solid fa-activity"></i> Activity</button>
+          <button class="admin-tab" data-tab="users"><i class="fa-solid fa-users"></i> Users</button>
+          <button class="admin-tab" data-tab="theme"><i class="fa-solid fa-palette"></i> Theme</button>
+          <button class="admin-tab" data-tab="settings"><i class="fa-solid fa-screwdriver-wrench"></i> Settings</button>
+        </div>
+
+        <!-- HOMEWORK -->
+        <div class="admin-panel" id="panel-homework">
+          <div class="admin-form">
+            <h3 class="heading-sm">Add Daily Homework</h3>
+            <div class="form-group"><label>Subject</label><input type="text" id="hwSubject" placeholder="e.g. MATHS"></div>
+            <div class="form-group"><label>Task</label><textarea id="hwTask" placeholder="Homework task description"></textarea></div>
+            <div class="form-group"><label>Due date</label><input type="text" id="hwDue" placeholder="e.g. 20 SEP 2026 (or leave empty)"></div>
+            <button class="btn btn-primary" id="addHwBtn"><i class="fa-solid fa-paper-plane"></i> Publish Homework</button>
+          </div>
+          <div id="hwAdminList"></div>
+        </div>
+
+        <!-- SCORES -->
+        <div class="admin-panel" id="panel-scores">
+          <div class="admin-form">
+            <h3 class="heading-sm">Add Test Score</h3>
+            <div class="form-group"><label>Student</label><select id="scStudent"></select></div>
+            <div class="form-group"><label>Subject</label><input type="text" id="scSubject" placeholder="e.g. MATHS"></div>
+            <div class="form-group"><label>Test name</label><input type="text" id="scTest" placeholder="e.g. Chapter 1-5 Test"></div>
+            <div class="form-group"><label>Score / Max</label>
+              <div style="display:flex;gap:10px">
+                <input type="number" id="scScore" placeholder="Score" min="0" step="0.01">
+                <input type="number" id="scMax" placeholder="Max marks" min="1" step="0.01">
+              </div>
+            </div>
+            <div class="form-group"><label>Test date (optional)</label><input type="text" id="scDate" placeholder="e.g. 15 SEP 2026"></div>
+            <button class="btn btn-primary" id="addScoreBtn"><i class="fa-solid fa-paper-plane"></i> Publish Test Score</button>
+          </div>
+          <div id="scoreAdminList"></div>
+        </div>
+
+        <!-- ANNOUNCEMENTS -->
+        <div class="admin-panel" id="panel-announce">
+          <div class="admin-form">
+            <h3 class="heading-sm">Post Announcement</h3>
+            <div class="form-group"><label>Title</label><input type="text" id="anTitle" placeholder="Announcement title"></div>
+            <div class="form-group"><label>Message</label><textarea id="anBody" placeholder="Announcement message"></textarea></div>
+            <button class="btn btn-primary" id="addAnnBtn"><i class="fa-solid fa-paper-plane"></i> Publish Announcement</button>
+          </div>
+          <div id="annAdminList"></div>
+        </div>
+
+        <!-- POLLS -->
+        <div class="admin-panel" id="panel-polls">
+          <div class="admin-form">
+            <h3 class="heading-sm">Create Class Poll</h3>
+            <div class="form-group"><label>Question</label><input type="text" id="pollQ" placeholder="Poll question"></div>
+            <div class="form-group"><label>Options</label>
+              <input type="text" id="op1" placeholder="Option 1" style="margin-bottom:8px">
+              <input type="text" id="op2" placeholder="Option 2" style="margin-bottom:8px">
+              <input type="text" id="op3" placeholder="Option 3 (optional)" style="margin-bottom:8px">
+              <input type="text" id="op4" placeholder="Option 4 (optional)">
+            </div>
+            <button class="btn btn-primary" id="addPollBtn"><i class="fa-solid fa-paper-plane"></i> Publish Poll</button>
+          </div>
+          <div id="pollAdminList"></div>
+        </div>
+
+        <!-- PROFILES -->
+        <div class="admin-panel" id="panel-profiles">
+          <div class="admin-form">
+            <h3 class="heading-sm">Edit Student Profiles</h3>
+            <div class="form-group"><label>Student</label><select id="profileStudent"></select></div>
+            <div class="form-group"><label>Bio</label><textarea id="pBio" placeholder="Short bio"></textarea></div>
+            <div class="form-group"><label>Strengths 💪</label><input type="text" id="pStrengths" placeholder="e.g. Honest, funny"></div>
+            <div class="form-group"><label>Interests ⭐</label><input type="text" id="pInterests" placeholder="e.g. Cricket, sketching"></div>
+            <div class="form-group"><label>Goals 🎯</label><input type="text" id="pGoals" placeholder="e.g. Become a doctor"></div>
+            <button class="btn btn-primary" id="saveProfileBtn"><i class="fa-solid fa-floppy-disk"></i> Save Profile</button>
+          </div>
+          <p class="text-muted" style="font-size:0.85rem">Saved profiles are instantly available to students and the Class AI.</p>
+        </div>
+
+        <!-- SUBJECTS -->
+        <div class="admin-panel" id="panel-subjects">
+          <div class="admin-form">
+            <h3 class="heading-sm">Manage Subjects</h3>
+            <div class="form-group"><label>Subject</label><select id="subjSelect"></select></div>
+            <div class="form-group"><label>Notes / Info (AI can read this)</label><textarea id="subjNotes" placeholder="Subject notes, syllabus, tips..."></textarea></div>
+            <div class="form-group"><label>Add photos (base64 stored locally)</label>
+              <input type="file" id="subjPhotoInput" accept="image/*" multiple style="margin-bottom:8px">
+              <div id="subjPhotoPreview" class="subject-photos"></div>
+            </div>
+            <button class="btn btn-primary" id="saveSubjBtn"><i class="fa-solid fa-floppy-disk"></i> Save Subject</button>
+          </div>
+          <div class="admin-form" style="margin-top:20px">
+            <h3 class="heading-sm">GitHub Resources URL</h3>
+            <div class="form-group"><label>Public JSON URL (see Settings → Backup for format)</label><input type="text" id="githubUrlInput" placeholder="https://raw.githubusercontent.com/.../resources.json"></div>
+            <button class="btn btn-primary" id="saveGithubBtn"><i class="fa-solid fa-cloud-arrow-down"></i> Save & Fetch</button>
+          </div>
+        </div>
+
+        <!-- AI BOT -->
+        <div class="admin-panel" id="panel-aibot">
+          <div class="admin-form">
+            <h3 class="heading-sm">Smart AI Brain</h3>
+            <p class="text-muted" style="font-size:.85rem;margin:8px 0 16px">Choose Local (free, offline, class-knowledge rules) or API (any OpenAI-compatible endpoint). API calls are made from each visitor's browser — for a real deployment you'd call the API from a server so the key stays secret.</p>
+            <div class="form-group"><label>Engine mode</label>
+              <select id="aiMode">
+                <option value="local">Local rule-based (offline, free)</option>
+                <option value="api">External API (needs key)</option>
+              </select>
+            </div>
+            <div class="form-group"><label>API key</label><input type="password" id="aiApiKey" placeholder="sk-..."></div>
+            <div class="form-group"><label>Base URL</label><input type="text" id="aiBaseUrl" placeholder="https://api.openai.com/v1"></div>
+            <div class="form-group"><label>Model</label><input type="text" id="aiModel" placeholder="gpt-4o-mini"></div>
+            <div class="form-group"><label>Temperature</label><input type="number" id="aiTemp" placeholder="0.7" min="0" max="2" step="0.1"></div>
+            <div class="form-group"><label>System prompt</label><textarea id="aiSystemPrompt" placeholder="You are Class AI..."></textarea></div>
+            <div class="form-group"><label>Test message</label><input type="text" id="aiTestMsg" placeholder="e.g. What is photosynthesis?" value="What is photosynthesis?"></div>
+            <button class="btn btn-primary" id="saveAiBtn"><i class="fa-solid fa-floppy-disk"></i> Save AI Config</button>
+            <button class="btn btn-secondary" id="testAiBtn"><i class="fa-solid fa-vial"></i> Test the Brain</button>
+            <div id="aiTestResult" style="margin-top:14px"></div>
+          </div>
+        </div>
+
+        <!-- ACTIVITY -->
+        <div class="admin-panel" id="panel-activity">
+          <div class="admin-form">
+            <h3 class="heading-sm">Live Class Activity</h3>
+            <div id="onlineNow" class="online-now"></div>
+            <div id="activityFeed" class="activity-feed"></div>
+          </div>
+        </div>
+
+        <!-- USERS -->
+        <div class="admin-panel" id="panel-users">
+          <div class="admin-form">
+            <h3 class="heading-sm">User Stats & Passwords</h3>
+            <div id="userStatsTable" class="user-stats-table"></div>
+          </div>
+        </div>
+
+        <!-- THEME -->
+        <div class="admin-panel" id="panel-theme">
+          <div class="admin-settings">
+            <h3 class="heading-sm">Theme — pick the site look</h3>
+            <p class="text-secondary" style="font-size:0.9rem;margin:10px 0">Choose how the whole hub looks for everyone on this device. Changes apply instantly across every page.</p>
+            <div class="theme-picker" id="themePicker"></div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="admin-panel" id="panel-settings">
+          <div class="admin-settings">
+            <h3 class="heading-sm">Data Backup — how to move data to a server / GitHub</h3>
+            <p class="text-secondary" style="font-size:0.9rem;margin:10px 0">Everything is stored in this browser's localStorage. To centralise it:</p>
+            <div class="backup-steps">
+              <ol>
+                <li><strong>Export</strong> the data below → save the JSON file.</li>
+                <li>Put it in a private GitHub repo (or Gist) → get its raw URL.</li>
+                <li>Tell classmates to <strong>Import</strong> the file here after opening the site, or paste the raw GitHub URL in Subjects → GitHub Resources to pull study links.</li>
+                <li>For a true live multi-user backend you'd need a small server (Node/Python) — this static site keeps everything in the browser for simplicity.</li>
+              </ol>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin:16px 0">
+              <button class="btn btn-primary" id="exportBtn"><i class="fa-solid fa-download"></i> Export Data (JSON)</button>
+              <label class="btn btn-secondary" style="cursor:pointer"><i class="fa-solid fa-upload"></i> Import Data<input type="file" id="importFile" accept="application/json" style="display:none"></label>
+            </div>
+            <hr style="border-color:var(--border);margin:20px 0">
+            <h3 class="heading-sm">Danger Zone</h3>
+            <p class="text-secondary" style="font-size:0.9rem;margin:10px 0">Reset every change back to the original seed data.</p>
+            <button class="btn btn-danger" id="resetBtn"><i class="fa-solid fa-rotate-left"></i> Reset All Data to Seed</button>
+            <div style="height:14px"></div>
+            <button class="btn btn-secondary" id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i> Log Out of Admin</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="data/seed.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/stickmen.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

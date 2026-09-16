@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "site_name": "AIA Class 10-A Hub",
+    "school": "ALPHA INTERNATIONAL ACADEMY",
+    "class": "CLASS 10-A",
+    "admin_name": "VINAY KHILERI",
+    "access_pass": "",
+    "note": "All content scraped from the original hatchable site on 2026-09-15. Rebuild concept+data only, never the design."
+  },
+  "teachers": [
+    { "subject": "English", "name": "Vishaka Maam", "detail": "English teacher" },
+    { "subject": "Hindi", "name": "Malchand Punia", "detail": "Class Teacher • wears glasses • looks good" },
+    { "subject": "Sanskrit", "name": "Yadhu Maam", "detail": "Sanskrit teacher" },
+    { "subject": "SST", "name": "Bharti Maam", "detail": "Newly joined about a week ago" },
+    { "subject": "Maths", "name": "Babulal Ji", "detail": "Most respected and elderly • working since the school opened • wears glasses" },
+    { "subject": "Science", "name": "Mahesh Degra Sir", "detail": "Good height • previous year's Class Teacher" }
+  ],
+  "leadership": [
+    { "role": "Director", "name": "Rekha Kataria" },
+    { "role": "Principal", "name": "Saroj Ma'am" }
+  ],
+  "students": [
+    "AAYAN", "ANIL", "ADITI", "ANJALI", "ARYAN", "CHTRA", "DIVYA", "DEVRAJ",
+    "GUNJAN", "HIMANSHU", "HARSHVARDHAN", "JYOTI", "KARTIK SAINI", "KARTIK SINGH",
+    "KANISHKA", "KAJAL", "LAKSHYA", "LATIKA", "NISHA", "NAKSH", "NIDHI", "NITIN",
+    "PARIDHI", "PARMESHWAR", "PAWAN", "RITU", "RUDRA", "SANIDHYA", "SIMRAN",
+    "TWINKLE", "VANSHIKA", "VINAY KHILERI", "YASHITA"
+  ],
+  "student_profiles": [
+    { "student_name": "AAYAN", "bio": "QUITE FAT BUT LOOKS HANDSOME AND HAVE UNDURABLE STRENGHT", "strengths": "HAIRSTYLE", "interests": "HAND BALL", "goals": "TO BE A HAND BALL PLAYER" },
+    { "student_name": "ANIL", "bio": "FULL NAME ANIL SINGH RAJAWAT. LOOKS HANDSOME GOOD HEIGHT AND HUGE ENERGY DURING THE HANDBALL GAME.", "strengths": "HANDWRITTING", "interests": "DRAWING AND SKETCHING", "goals": "DIN'T KNOW" },
+    { "student_name": "RUDRA", "bio": "ADMIN'S FRIEND\nFULL NAME RUDRA SINGH SHEKHAWAT\nTHIN MOUSTHACHE\nAGE-15", "strengths": "HAND PLAYER", "interests": "TIMEPASS", "goals": "BUISNESS" }
+  ],
+  "homework": [
+    { "subject": "ECONOMICS", "task": "TODAY WAS OUR CLASS TEST.\nHOW WAS IT 🤘", "due_date": "15 SEP 2026" }
+  ],
+  "announcements": [
+    { "title": "ANNUAL FUNCTION", "body": "ANNUAL Function will be held in our school on 31st of October or 5th of November.\nParticipants have to pay a sum of rupees 850" }
+  ],
+  "polls": [
+    { "question": "WHO IS YOUR FAVOURITE TEACHER", "options": ["BABULAL JI", "MAHESH JI", "YADHU MAAM", "VISHAKA MAAM"], "created_at": "2026-09-14T18:39:48.823692+00:00" }
+  ],
+  "test_scores": [
+    { "student_name": "NITIN", "subject": "MATHS", "test_name": "CHAPTER 1,2,3,4,5,7,8,9,13", "score": 49, "max_score": 50, "test_date": null }
+  ],
+  "other": [
+    { "note": "Section 10-B is included in the system for comparison/progress viewing. No 10-B student data has been entered yet." }
+  ]
+}

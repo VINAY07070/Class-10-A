@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b1240"/>
+      <stop offset=".55" stop-color="#4f2bd6"/>
+      <stop offset="1" stop-color="#0e7fd0"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffd889"/>
+      <stop offset="1" stop-color="#f5a524"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="30%" r="70%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
+  <rect width="64" height="64" rx="16" fill="url(#glow)"/>
+  <!-- graduation cap -->
+  <path d="M32 16 L58 25 L32 34 L6 25 Z" fill="url(#gold)"/>
+  <path d="M12 28.5 V37 C12 40 21 44 32 44 C43 44 52 40 52 37 V28.5 L32 37 Z" fill="#f5b544" opacity=".9"/>
+  <path d="M58 25 L58 34" stroke="#ffd889" stroke-width="2.4" stroke-linecap="round"/>
+  <circle cx="32" cy="25" r="2.6" fill="#1b1240"/>
+  <!-- tassel -->
+  <path d="M32 34 L32 41" stroke="#ffd889" stroke-width="1.6" stroke-linecap="round"/>
+  <circle cx="32" cy="42.4" r="1.8" fill="#ffd889"/>
+  <!-- sparkles -->
+  <circle cx="52" cy="13" r="3.2" fill="#fff" opacity=".85"/>
+  <circle cx="56.2" cy="10.4" r="1.4" fill="#fff" opacity=".6"/>
+  <circle cx="49" cy="9" r="1.1" fill="#fff" opacity=".45"/>
+</svg>

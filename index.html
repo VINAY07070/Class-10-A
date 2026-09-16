@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('aia_theme');
+        if (t && ['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) !== -1) {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIA Class 10-A Hub — Welcome</title>
+  <meta name="description" content="AIA Class 10-A digital hub — students, teachers, homework, scores, chat, polls, subject resources, and AI study bot.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/stickmen.css">
+  <link rel="stylesheet" href="css/themes.css">
+
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+
+  <!-- ===================== LOGIN OVERLAY (first thing visitors see) ===================== -->
+  <div class="login-overlay" id="loginOverlay">
+    <canvas id="loginCanvas" class="login-canvas"></canvas>
+    <div class="login-aurora">
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+
+    <div class="login-badge-glow"></div>
+
+    <div class="login-stage">
+      <div class="login-brand">
+        <div class="login-logo"><svg viewBox="0 0 64 64" width="34" height="34" aria-hidden="true"><path d="M32 8 L58 19 L32 30 L6 19 Z" fill="url(#lglg)"/><path d="M12 22.5 V31 C12 34 21 38 32 38 C43 38 52 34 52 31 V22.5 L32 31 Z" fill="#ffd889" opacity=".92"/><path d="M58 19 L58 28" stroke="#ffd889" stroke-width="2.4" stroke-linecap="round"/><defs><linearGradient id="lglg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffd889"/><stop offset="1" stop-color="#f5a524"/></linearGradient></defs></svg></div>
+        <div class="login-school">ALPHA INTERNATIONAL ACADEMY</div>
+        <div class="login-class" id="loginClass">CLASS 10-A HUB</div>
+        <div class="login-sub" id="loginSub" onclick="App && App.startLoginType()"></div>
+      </div>
+
+      <div class="login-body">
+        <!-- mode chips -->
+        <div class="login-modes">
+          <button class="login-mode-chip active" data-mode="student" id="modeStudentBtn">
+            <i class="fa-solid fa-id-badge"></i> Student
+          </button>
+          <button class="login-mode-chip" data-mode="visitor" id="modeVisitorBtn">
+            <i class="fa-solid fa-key"></i> Visitor Pass
+          </button>
+        </div>
+
+        <!-- STUDENT FORM -->
+        <form class="login-form active" id="studentForm" autocomplete="off">
+          <div class="login-field">
+            <i class="fa-solid fa-user"></i>
+            <input type="text" id="loginUsername" placeholder="Username" autocomplete="off">
+          </div>
+          <div class="login-field">
+            <i class="fa-solid fa-lock"></i>
+            <input type="password" id="loginPassword" placeholder="Password" autocomplete="off">
+          </div>
+          <button type="submit" class="login-btn" id="studentLoginBtn">
+            <span class="login-btn-text">Enter the Hub</span>
+            <span class="login-btn-load" style="display:none"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+          </button>
+          <div class="login-hint">Don't know your username/password? Ask the admin — VINAY KHILERI.</div>
+        </form>
+
+        <!-- VISITOR FORM -->
+        <form class="login-form" id="visitorForm" autocomplete="off">
+          <div class="login-field">
+            <i class="fa-solid fa-shield-halved"></i>
+            <input type="password" id="visitorPass" placeholder="Class access pass" autocomplete="off">
+          </div>
+          <button type="submit" class="login-btn" id="visitorLoginBtn">Unlock the Site</button>
+          <div class="login-hint">Visitor pass lets you explore everything without a student account.</div>
+        </form>
+
+        <div class="login-error" id="loginError"></div>
+
+        <div class="login-foot">
+          <span class="login-foot-item"><i class="fa-solid fa-robot"></i> Class AI</span>
+          <span class="login-foot-item"><i class="fa-solid fa-message"></i> Student Chat</span>
+          <span class="login-foot-item"><i class="fa-solid fa-fire"></i> 6 Subjects</span>
+          <span class="login-foot-item"><i class="fa-solid fa-chart-line"></i> Live Stats</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-scrollhint"><i class="fa-solid fa-angles-down"></i></div>
+  </div>
+
+  <!-- ===================== MAIN SITE ===================== -->
+  <div id="mainSite" style="display:none">
+
+  <!-- HERO -->
+  <section class="hero">
+    <canvas id="heroCanvas" class="hero-canvas"></canvas>
+    <div class="hero-aurora">
+      <div class="blob"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+    </div>
+    <div class="hero-content container">
+      <span class="hero-eyebrow" data-reveal>🏫 ALPHA INTERNATIONAL ACADEMY · CLASS 10-A</span>
+      <h1 class="hero-title">
+        <span class="line-top" data-reveal>Your Class.</span>
+        <span class="line-glow" data-reveal>Your <span class="grad-text">Universe.</span></span>
+      </h1>
+      <p class="hero-subtitle" id="heroSub" data-reveal></p>
+      <div class="hero-actions" data-reveal>
+        <a href="students.html" class="btn btn-primary" data-magnetic><i class="fa-solid fa-users"></i> Meet the Class</a>
+        <a href="ai.html" class="btn btn-ghost" data-magnetic><i class="fa-solid fa-robot"></i> Talk to Class AI</a>
+      </div>
+      <div class="hero-float hero-float-1" data-reveal data-parallax="0.3"><i class="fa-solid fa-book-open"></i></div>
+      <div class="hero-float hero-float-2" data-reveal data-parallax="-0.25"><i class="fa-solid fa-chart-simple"></i></div>
+      <div class="hero-float hero-float-3" data-reveal data-parallax="0.2"><i class="fa-solid fa-message"></i></div>
+      <div class="hero-float hero-float-4" data-reveal data-parallax="-0.35"><i class="fa-solid fa-calculator"></i></div>
+
+    </div>
+  </section>
+
+  <!-- MARQUEE (updates ticker) -->
+  <div class="marquee-strip" role="marquee" aria-label="Latest updates">
+    <div class="marquee-track">
+      <div class="marquee-item"><span class="badge">EVENT</span> ANNUAL FUNCTION — 31 OCT or 5 NOV · Fee ₹850</div>
+      <div class="marquee-item"><span class="badge blue">TESTS</span> ECONOMICS class test done — how was it?</div>
+      <div class="marquee-item"><span class="badge">TOPPER</span> 👑 NITIN scored 49/50 in MATHS!</div>
+      <div class="marquee-item"><span class="badge blue">LIVE</span> 🗳️ Favourite teacher poll — vote now!</div>
+      <div class="marquee-item"><span class="badge">CHAT</span> 💬 Student chat is open — login and say hi!</div>
+      <div class="marquee-item"><span class="badge blue">AI</span> 🤖 Class AI now supports smart API mode.</div>
+      <div class="marquee-item"><span class="badge">EVENT</span> ANNUAL FUNCTION — 31 OCT or 5 NOV · Fee ₹850</div>
+      <div class="marquee-item"><span class="badge blue">TESTS</span> ECONOMICS class test done — how was it?</div>
+      <div class="marquee-item"><span class="badge">TOPPER</span> 👑 NITIN scored 49/50 in MATHS!</div>
+      <div class="marquee-item"><span class="badge blue">LIVE</span> 🗳️ Favourite teacher poll — vote now!</div>
+      <div class="marquee-item"><span class="badge">CHAT</span> 💬 Student chat is open — login and say hi!</div>
+      <div class="marquee-item"><span class="badge blue">AI</span> 🤖 Class AI now supports smart API mode.</div>
+    </div>
+  </div>
+
+  <!-- FEATURE CARDS -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Explore</span>
+        <h2 class="heading-lg">Everything in <span class="grad-text">one place</span></h2>
+        <p class="text-secondary">Everything your class needs, all in one place.</p>
+      </div>
+      <div class="feature-grid">
+        <a href="students.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(79,140,255,.16);color:#4f8cff"><i class="fa-solid fa-users"></i></div>
+          <h3>Classmates</h3>
+          <p>All 33 students with search, profiles and hidden talents.</p>
+          <span class="feature-link">Explore →</span>
+        </a>
+        <a href="chat.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(56,224,255,.15);color:#38e0ff"><i class="fa-solid fa-message"></i></div>
+          <h3 class="feature-new">Student Chat</h3>
+          <p>Private login, class chatroom, your name only. Admin sees all.</p>
+          <span class="feature-link">Chat now →</span>
+        </a>
+        <a href="subjects.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(52,211,153,.16);color:#34d399"><i class="fa-solid fa-book-open"></i></div>
+          <h3 class="feature-new">Subject Hub</h3>
+          <p>6 subjects with notes, photos and homework in one place.</p>
+          <span class="feature-link">Open subjects →</span>
+        </a>
+        <a href="homework.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(245,181,68,.16);color:#f5b544"><i class="fa-solid fa-list-check"></i></div>
+          <h3>Homework</h3>
+          <p>Assignments with live countdowns and class comment threads.</p>
+          <span class="feature-link">See homework →</span>
+        </a>
+        <a href="scores.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(124,108,255,.16);color:#7c6cff"><i class="fa-solid fa-ranking-star"></i></div>
+          <h3>Scores</h3>
+          <p>Test results, percentages, grade distribution and analytics.</p>
+          <span class="feature-link">View scores →</span>
+        </a>
+        <a href="announcements.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(255,138,61,.16);color:#ff8a3d"><i class="fa-solid fa-bullhorn"></i></div>
+          <h3>Announcements</h3>
+          <p>Official school news — comment under any post.</p>
+          <span class="feature-link">Read news →</span>
+        </a>
+        <a href="polls.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(255,110,199,.16);color:#ff6ec7"><i class="fa-solid fa-check-to-slot"></i></div>
+          <h3>Polls</h3>
+          <p>Cast your vote, watch live animated results.</p>
+          <span class="feature-link">Vote now →</span>
+        </a>
+        <a href="ai.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(34,211,238,.16);color:#22d3ee"><i class="fa-solid fa-robot"></i></div>
+          <h3>Class AI</h3>
+          <p>Study bot, quiz bot, homework bot — or smart API brain.</p>
+          <span class="feature-link">Chat with AI →</span>
+        </a>
+        <a href="admin.html" class="feature-card" data-tilt data-reveal>
+          <div class="feature-icon" style="background:rgba(255,77,109,.14);color:#ff4d6d"><i class="fa-solid fa-gear"></i></div>
+          <h3>Admin Panel</h3>
+          <p>Analytics, activity feed, AI config, users, backup & more.</p>
+          <span class="feature-link">Open panel →</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIVIDER -->
+  <div class="angled-divider"><svg viewBox="0 0 1440 64" preserveAspectRatio="none"><path d="M0,0 L1440,64 L1440,0 Z"/></svg></div>
+
+  <!-- LATEST ANNOUNCEMENT -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Latest News</span>
+        <h2 class="heading-md">From the Principal's desk</h2>
+      </div>
+      <div class="announcement-spotlight" id="announcementSpotlight" data-reveal></div>
+    </div>
+  </section>
+
+  <!-- TEACHER SPOTLIGHT -->
+  <section class="section">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Faculty</span>
+        <h2 class="heading-md">Teacher spotlight</h2>
+      </div>
+      <div class="teacher-spotlight-grid" id="teacherSpotlight" data-reveal></div>
+    </div>
+  </section>
+
+  <!-- QUICK GRID -->
+  <section class="section section-alt">
+    <div class="container">
+      <div class="section-head" data-reveal>
+        <span class="eyebrow">Quick Access</span>
+        <h2 class="heading-md">Jump anywhere</h2>
+      </div>
+      <div class="quick-grid" data-stagger>
+        <a href="students.html" class="quick-link"><i class="fa-solid fa-users"></i> Classmates</a>
+        <a href="teachers.html" class="quick-link gold"><i class="fa-solid fa-user-tie"></i> Teachers</a>
+        <a href="homework.html" class="quick-link"><i class="fa-solid fa-list-check"></i> Homework</a>
+        <a href="scores.html" class="quick-link gold"><i class="fa-solid fa-ranking-star"></i> Scores</a>
+        <a href="announcements.html" class="quick-link"><i class="fa-solid fa-bullhorn"></i> News</a>
+        <a href="polls.html" class="quick-link gold"><i class="fa-solid fa-check-to-slot"></i> Polls</a>
+        <a href="chat.html" class="quick-link"><i class="fa-solid fa-message"></i> Chat</a>
+        <a href="subjects.html" class="quick-link gold"><i class="fa-solid fa-book-open"></i> Subjects</a>
+        <a href="ai.html" class="quick-link"><i class="fa-solid fa-robot"></i> Class AI</a>
+        <a href="admin.html" class="quick-link gold"><i class="fa-solid fa-gear"></i> Admin Panel</a>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="data/seed.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/stickmen.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/home.js"></script>
+</body>
+</html>

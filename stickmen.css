@@ -1,0 +1,169 @@
+/* ============================================================
+   STICK MEN — VINAY & NITIN (v4) styles
+   ------------------------------------------------------------
+   Small calm mascots, 44x64. Position is driven by JS
+   (translate3d per frame) — no CSS transitions on transforms,
+   so the physics loop owns all movement. Only the speech
+   bubble gets a fade transition.
+   ============================================================ */
+
+/* ----- stage: fixed overlay, never blocks clicks ----- */
+.stickmen-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 7000;
+  pointer-events: none;
+  overflow: hidden;
+}
+.stickmen-stage .stickman { pointer-events: auto; }
+
+/* ----- individual figure: 44x64, absolute, JS-positioned ----- */
+.stickman {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 44px;
+  height: 64px;
+  cursor: pointer;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+.stickman:focus { outline: none; }
+
+/* the SVG takes the full figure box */
+.stickman .sm-svg {
+  display: block;
+  width: 44px;
+  height: 64px;
+}
+
+/* ----- name tag above head ----- */
+.sm-tag {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  color: rgba(255,255,255,.9);
+  background: rgba(10,14,28,.55);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* ----- speech bubble (fade + rise, JS-toggled) ----- */
+.sm-bubble {
+  position: absolute;
+  bottom: calc(100% - 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  background: rgba(12,18,38,.92);
+  border: 1px solid rgba(255,255,255,.18);
+  color: var(--text, #eef1ff);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  padding: 6px 11px;
+  border-radius: 14px 14px 14px 4px;
+  white-space: nowrap;
+  max-width: 190px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s ease, transform .22s ease;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.sm-bubble::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  background: inherit;
+  border-right: 1px solid rgba(255,255,255,.18);
+  border-bottom: 1px solid rgba(255,255,255,.18);
+  transform: rotate(45deg);
+}
+.sm-bubble.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ----- click sparkle particles ----- */
+.sm-spark {
+  position: fixed;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, #ffd889 60%, rgba(255,216,137,0));
+  pointer-events: none;
+  z-index: 7100;
+  animation: smSparkFly .9s ease-out forwards;
+}
+@keyframes smSparkFly {
+  0%   { transform: scale(1) translateY(0); opacity: 1; }
+  100% { transform: scale(.1) translateY(-18px); opacity: 0; }
+}
+
+/* ----- tiny sparkle above Vinay (CSS twinkle is a graceful fallback;
+         JS sets opacity per frame when running) ----- */
+.stickman.sm-vinay .sm-sparkle { animation: smTwinkle 1.8s ease-in-out infinite; }
+@keyframes smTwinkle {
+  0%, 100% { opacity: .35; }
+  50%      { opacity: 1; }
+}
+
+/* ----- hide entire stage via toggle ----- */
+.stickmen-hidden .stickmen-stage { display: none; }
+
+/* ----- toggle button: 32px, semi-transparent, bottom-right ----- */
+.stickmen-toggle {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(12,18,38,.55);
+  color: rgba(255,255,255,.85);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  z-index: 7005;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background .25s ease, transform .25s ease;
+  touch-action: manipulation;
+  padding: 0;
+  box-shadow: 0 4px 14px rgba(0,0,0,.3);
+}
+.stickmen-toggle:hover {
+  background: rgba(124,108,255,.6);
+  transform: scale(1.08);
+}
+.stickmen-toggle:active { transform: scale(.94); }
+
+/* ----- mobile: keep small, clear the tabbar ----- */
+@media (max-width: 640px) {
+  .stickman { width: 44px; height: 64px; }
+  .sm-tag { font-size: 7.5px; top: -14px; padding: 1px 6px; }
+  .sm-bubble { font-size: 10px; max-width: 160px; padding: 5px 10px; }
+  .stickmen-toggle { bottom: 76px; right: 12px; }
+}
+
+/* ----- reduced motion: fully static pose, no movement ----- */
+@media (prefers-reduced-motion: reduce) {
+  .stickman .sm-svg * { animation: none !important; }
+  .sm-spark, .stickman.sm-vinay .sm-sparkle { animation: none !important; opacity: 1; }
+  .stickmen-toggle { transition: none; }
+}
