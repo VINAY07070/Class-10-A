@@ -1,2 +1,2 @@
-/* Theme variations - moved from root to css folder */
-/* Include all themes.css content here */
+/* Theme stylesheet compatibility entry point. */
+@import url('../themes.css');

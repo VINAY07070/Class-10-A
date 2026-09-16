@@ -1,4 +1,2 @@
-/* Main stylesheet - moved from root to css folder */
-/* Include all style.css content here */
-@import url('./themes.css');
-@import url('./stickmen.css');
+/* Main stylesheet compatibility entry point. */
+@import url('../style.css');

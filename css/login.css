@@ -1,0 +1,44 @@
+/* Login presentation and mobile layout improvements. */
+.login-overlay {
+  min-height: 100svh;
+  padding: clamp(18px, 4vw, 48px) 16px;
+  overflow-y: auto;
+}
+.login-stage {
+  width: min(100%, 460px);
+  margin: auto;
+  position: relative;
+  z-index: 1;
+}
+.login-brand { text-align: center; margin-bottom: 18px; }
+.login-logo { margin: 0 auto 12px; }
+.login-school { letter-spacing: .18em; font-size: clamp(10px, 2vw, 12px); }
+.login-class { font-size: clamp(26px, 7vw, 42px); line-height: 1.05; }
+.login-sub { min-height: 22px; margin-top: 8px; }
+.login-body {
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 24px;
+  padding: clamp(18px, 5vw, 30px);
+  background: rgba(10, 15, 35, .72);
+  box-shadow: 0 24px 70px rgba(0,0,0,.38), inset 0 1px rgba(255,255,255,.08);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.login-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+.login-mode-chip { min-height: 44px; border-radius: 12px; cursor: pointer; }
+.login-field { min-height: 52px; border-radius: 13px; }
+.login-field input { min-width: 0; width: 100%; font-size: 16px; }
+.login-btn { min-height: 52px; border-radius: 13px; font-weight: 800; cursor: pointer; }
+.login-hint { line-height: 1.45; }
+.login-error { min-height: 24px; margin-top: 12px; text-align: center; }
+.login-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+.login-foot-item { font-size: 11px; text-align: center; }
+@media (max-width: 480px) {
+  .login-overlay { align-items: flex-start; }
+  .login-body { border-radius: 18px; }
+  .login-foot { gap: 8px; }
+  .login-foot-item { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-overlay *, .login-overlay *::before, .login-overlay *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
