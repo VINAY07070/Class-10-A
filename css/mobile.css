@@ -1,0 +1,12 @@
+/* Small-screen layout safeguards. */
+html { overflow-x: hidden; }
+body { min-width: 320px; padding-bottom: env(safe-area-inset-bottom); }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+@media (max-width: 640px) {
+  .container { width: min(100% - 28px, 1120px); }
+  .tabbar { padding-bottom: env(safe-area-inset-bottom); }
+  .feature-grid, .teacher-spotlight-grid { grid-template-columns: 1fr !important; }
+  .navbar-clock { display: none; }
+  .hero-title { font-size: clamp(38px, 13vw, 68px); }
+  .btn { min-height: 44px; }
+}

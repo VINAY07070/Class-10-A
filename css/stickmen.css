@@ -1,174 +1,53 @@
-/* ============================================================
-   STICK MEN — VINAY & NITIN (v5) enhanced styles
-   Professional, mobile-optimized, with glasses effect
-   ============================================================ */
-
-.stickmen-stage {
+/* Iconic stickmen live in a fixed bottom strip and never cover content. */
+.simple-stickmen-stage {
   position: fixed;
-  inset: 0;
-  z-index: 7000;
+  left: 0;
+  right: 0;
+  bottom: max(58px, env(safe-area-inset-bottom));
+  height: 82px;
+  z-index: 120;
   pointer-events: none;
   overflow: hidden;
 }
-.stickmen-stage .stickman { pointer-events: auto; }
-
-.stickman {
+.simple-stickman {
+  position: absolute;
+  bottom: 0;
+  width: 48px;
+  height: 76px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--stick-color, #fff);
+  pointer-events: auto;
+  cursor: pointer;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.3));
+  transition: filter .2s ease;
+}
+.simple-stickman:hover { filter: drop-shadow(0 3px 8px rgba(124,108,255,.55)); }
+.simple-stickman svg { display: block; width: 48px; height: 72px; }
+.simple-stickman-name {
   position: absolute;
   top: 0;
-  left: 0;
-  width: 44px;
-  height: 64px;
-  cursor: pointer;
-  will-change: transform;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-}
-.stickman:focus { outline: none; }
-
-.stickman .sm-svg {
-  display: block;
-  width: 44px;
-  height: 64px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
-  transition: filter 0.3s ease;
-}
-.stickman:hover .sm-svg {
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
-}
-
-.sm-tag {
-  position: absolute;
-  top: -15px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: .05em;
-  color: rgba(255,255,255,.9);
-  background: rgba(10,14,28,.65);
-  border: 1px solid rgba(255,255,255,.2);
-  border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  color: #fff;
+  background: rgba(9,13,27,.72);
+  font: 700 8px/1.1 system-ui, sans-serif;
   white-space: nowrap;
-  pointer-events: none;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
-
-.sm-bubble {
-  position: absolute;
-  bottom: calc(100% - 6px);
-  left: 50%;
-  transform: translateX(-50%) translateY(6px);
-  background: rgba(12,18,38,.95);
-  border: 1px solid rgba(255,255,255,.2);
-  color: var(--text, #eef1ff);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.4;
-  padding: 7px 12px;
-  border-radius: 14px 14px 14px 4px;
-  white-space: nowrap;
-  max-width: 200px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .25s ease, transform .25s ease;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  z-index: 7010;
+.simple-stickman.is-walking svg { animation: simple-step .32s ease-in-out infinite alternate; }
+.simple-stickman-pop { animation: simple-pop .42s ease-out; }
+@keyframes simple-step { from { transform: translateX(-1px) rotate(-2deg); } to { transform: translateX(1px) rotate(2deg); } }
+@keyframes simple-pop { 50% { transform: translateY(-12px) scale(1.08); } }
+@media (max-width: 640px) {
+  .simple-stickmen-stage { bottom: calc(62px + env(safe-area-inset-bottom)); height: 68px; }
+  .simple-stickman { width: 40px; height: 62px; }
+  .simple-stickman svg { width: 40px; height: 60px; }
+  .simple-stickman-name { font-size: 7px; }
 }
-.sm-bubble::after {
-  content: '';
-  position: absolute;
-  left: 14px;
-  bottom: -6px;
-  width: 10px;
-  height: 10px;
-  background: inherit;
-  border-right: 1px solid rgba(255,255,255,.2);
-  border-bottom: 1px solid rgba(255,255,255,.2);
-  transform: rotate(45deg);
-}
-.sm-bubble.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.sm-spark {
-  position: fixed;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff, #ffd889 60%, rgba(255,216,137,0));
-  pointer-events: none;
-  z-index: 7100;
-  animation: smSparkFly .9s ease-out forwards;
-  box-shadow: 0 0 4px rgba(255,216,137,0.6);
-}
-@keyframes smSparkFly {
-  0%   { transform: scale(1) translateY(0); opacity: 1; }
-  100% { transform: scale(.1) translateY(-20px); opacity: 0; }
-}
-
-.stickman.sm-vinay .sm-sparkle {
-  animation: smTwinkle 1.8s ease-in-out infinite;
-}
-@keyframes smTwinkle {
-  0%, 100% { opacity: .35; }
-  50%      { opacity: 1; }
-}
-
-.stickmen-hidden .stickmen-stage { display: none; }
-
-.stickmen-toggle {
-  position: fixed;
-  right: 14px;
-  bottom: 14px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(255,255,255,.25);
-  background: rgba(12,18,38,.7);
-  color: rgba(255,255,255,.9);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  z-index: 7005;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: all .28s cubic-bezier(0.34, 1.56, 0.64, 1);
-  padding: 0;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
-}
-.stickmen-toggle:hover {
-  background: rgba(124,108,255,.75);
-  transform: scale(1.12) rotate(8deg);
-  box-shadow: 0 6px 20px rgba(124,108,255,0.4);
-}
-.stickmen-toggle:active {
-  transform: scale(.92);
-}
-
-@media (max-width: 768px) {
-  .stickman { width: 40px; height: 58px; }
-  .stickman .sm-svg { width: 40px; height: 58px; }
-  .sm-tag { font-size: 7px; top: -13px; padding: 1px 6px; }
-  .sm-bubble { font-size: 10px; max-width: 150px; padding: 5px 9px; bottom: calc(100% - 4px); }
-  .stickmen-toggle { width: 34px; height: 34px; font-size: 14px; bottom: 70px; right: 12px; }
-}
-
-@media (max-width: 480px) {
-  .stickman { width: 36px; height: 54px; }
-  .stickman .sm-svg { width: 36px; height: 54px; }
-  .sm-tag { font-size: 6px; top: -12px; padding: 1px 5px; }
-  .sm-bubble { font-size: 9px; max-width: 140px; padding: 4px 8px; }
-  .stickmen-toggle { width: 32px; height: 32px; font-size: 12px; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .stickman .sm-svg * { animation: none !important; }
-  .sm-spark, .stickman.sm-vinay .sm-sparkle { animation: none !important; opacity: 1; }
-  .stickmen-toggle { transition: none; }
+  .simple-stickman, .simple-stickman svg { animation: none !important; transition: none !important; }
 }
