@@ -104,17 +104,23 @@
   }
 
   function parseDueDate(str) {
-    // Handle "15 SEP 2026" format
-    var parts = str.split(' ');
+    // Handle "15 SEP 2026" format — due = END of that day (not midnight)
+    var parts = String(str).trim().split(' ');
     if (parts.length === 3) {
       var months = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
       var day = parseInt(parts[0], 10);
       var month = months[parts[1].toUpperCase()];
       var year = parseInt(parts[2], 10);
-      return new Date(year, month, day);
+      if (!isNaN(day) && month !== undefined && !isNaN(year)) return new Date(year, month, day, 23, 59, 59);
     }
-    return new Date(str);
+    var d = new Date(str);
+    if (!isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}$/.test(String(str).trim())) d.setHours(23, 59, 59, 0);
+    return d;
   }
+
+  App.observeReveals(listEl);
+  var hwT = 0;
+  window.__aiaRefresh = function () { clearTimeout(hwT); hwT = setTimeout(function () { render(); App.observeReveals(listEl); }, 300); };
 
   render();
 })();

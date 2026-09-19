@@ -114,13 +114,28 @@
     if (photos.length) {
       html += '<div class="subject-modal-section"><h4 class="heading-sm"><i class="fa-solid fa-images"></i> Photos (' + photos.length + ')</h4>';
       html += '<div class="subject-photos">' + photos.map(function (p, i) {
-        return '<img src="' + p + '" alt="' + App.escapeHtml(name) + ' photo ' + (i + 1) + '" loading="lazy" onclick="window.open(this.src)">';
+        return '<img src="' + p + '" alt="' + App.escapeHtml(name) + ' photo ' + (i + 1) + '" loading="lazy" data-photo="' + i + '">';
       }).join('') + '</div></div>';
     }
 
     modalContent.innerHTML = html;
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
+    /* photo lightbox (no popup blocker issues, pinch-zoom friendly) */
+    modalContent.querySelectorAll('[data-photo]').forEach(function (img) {
+      img.addEventListener('click', function () { openLightbox(img.src); });
+    });
+  }
+
+  function openLightbox(src) {
+    var lb = document.createElement('div');
+    lb.className = 'lightbox';
+    lb.innerHTML = '<img src="' + src + '" alt="photo"><button class="lightbox-close" aria-label="Close">✕</button>';
+    document.body.appendChild(lb);
+    document.body.style.overflow = 'hidden';
+    function close() { lb.remove(); document.body.style.overflow = modal.classList.contains('open') ? 'hidden' : ''; }
+    lb.addEventListener('click', close);
+    document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
   }
 
   function closeModal() {
@@ -133,7 +148,7 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
   /* ---------- GitHub resources ---------- */
-  var GITHUB_URL = DataStore.getGithubUrl();
+  function currentGithubUrl() { return DataStore.getGithubUrl(); }
 
   function renderGithub(resources) {
     var hasAny = resources && (resources.resources && resources.resources.length || resources.links && resources.links.length);
@@ -155,13 +170,14 @@
   }
 
   function loadGithub() {
+    var GITHUB_URL = currentGithubUrl();
     if (!GITHUB_URL) { renderGithub(null); return; }
     var cached = DataStore.getGithubData();
     if (cached && cached.url === GITHUB_URL) { renderGithub(cached.data); return; }
     fetch(GITHUB_URL)
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (data) {
-        DataStore.setGithubData({ url: GITHUB_URL, data: data, fetchedAt: new Date().toISOString() });
+        DataStore.setGithubData({ url: currentGithubUrl(), data: data, fetchedAt: new Date().toISOString() });
         renderGithub(data);
         if (data.resources && data.resources.length) App.showToast('Resources synced from GitHub 🚀', 'success');
       })
@@ -177,4 +193,10 @@
   renderPills();
   renderGrid();
   loadGithub();
+  App.observeReveals(gridEl);
+  var sjT = 0;
+  window.__aiaRefresh = function () {
+    clearTimeout(sjT);
+    sjT = setTimeout(function () { subjects = DataStore.getSubjects(); renderGrid(); App.observeReveals(gridEl); }, 300);
+  };
 })();

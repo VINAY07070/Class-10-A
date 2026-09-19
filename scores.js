@@ -144,5 +144,11 @@
     gradeDist.querySelectorAll('.grade-fill').forEach(function (fill) { observer.observe(fill); });
   }
 
+  var scT = 0;
+  window.__aiaRefresh = function () {
+    clearTimeout(scT);
+    scT = setTimeout(function () { scores = DataStore.getTestScores(); render(); App.observeReveals(document); }, 300);
+  };
+
   render();
 })();

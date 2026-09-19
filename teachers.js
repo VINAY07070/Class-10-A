@@ -35,4 +35,7 @@
       '<div class="teacher-detail">AIA School Leadership</div>' +
       '</div>';
   }).join('');
+
+  App.initTiltCards();
+  App.observeReveals(document);
 })();

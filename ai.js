@@ -315,7 +315,7 @@
     s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
     s = s.replace(/`(.+?)`/g, '<code>$1</code>');
     s = s.replace(/^- (.*)$/gm, '<li>$1</li>');
-    s = s.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+    s = s.replace(/((?:<li>.*<\/li>(?:\r?\n)?)+)/g, '<ul>$1</ul>');
     s = s.replace(/\n/g, '<br>');
     return s;
   }

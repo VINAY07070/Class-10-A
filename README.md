@@ -1,61 +1,90 @@
 # 🎓 AIA Class 10-A Hub
 
 The premium digital home for **Alpha International Academy — Class 10-A**.
-Rebuilt from scratch (concept + data only, zero copied design) as a multi-billion-dollar-grade static site with Apple-inspired light/dark glass design.
+Multi-page static site (HTML + CSS + vanilla JS, no build step) with Apple-grade
+dark glass design, 8 themes, live group chat, polls, AI study bot — and
+**serverless sync**: every tab and every phone stays in sync with no server.
 
 ## 🚀 How to open
 
-Just double-click **`index.html`** — works fully offline in any modern browser (no server needed).
+Just double-click **`index.html`** — works fully offline in any modern browser
+(no server needed). Also deployable anywhere static (`Render`, `GitHub Pages`,
+`Netlify`) or via the optional tiny Node hub (`npm start` → `server.js`).
 
-**Access:** student username/password login (no visitor pass)
+**Access:** student username/password login, or the visitor pass. Admin accounts:
+`admin_vinay` / `admin_nitin` (owner panel in `admin.html`).
 
 ## 📄 Pages
 
 | Page | What's inside |
 |---|---|
-| `index.html` | Cinematic hero, live stats, feature cards, announcement marquee |
+| `index.html` | Cinematic hero, live stats, feature cards, news spotlight |
 | `students.html` | All 33 students, searchable grid, profile modal |
 | `teachers.html` | 6 teachers + school leadership |
-| `homework.html` | Homework tracker with due-countdown badges + comment threads |
-| `scores.html` | Test scores, animated % bars, analytics |
-| `announcements.html` | News cards + comment threads |
-| `polls.html` | Live polls with animated result bars + confetti on vote |
-| `ai.html` | Class AI — Study / Homework / Quiz bots (local smart engine) |
-| `admin.html` | Owner panel: manage everything |
+| `subjects.html` | 6 subjects: notes, homework links, photos + lightbox |
+| `chat.html` | **Live group chat** — everyone sees everyone, typing dots |
+| `homework.html` | Tracker with due-countdown badges + comment threads |
+| `scores.html` | Test scores, animated % bars, analytics (printable) |
+| `announcements.html` | News cards + comment threads, NEW badges |
+| `polls.html` | Live polls, one vote per student, confetti on vote |
+| `ai.html` | Class AI — Study / Homework / Quiz bots (local + API brain) |
+| `admin.html` | Owner panel: content, users, photos, AI config, sync, themes |
 
-## 👤 Admin
+## ⇄ Sync — WITHOUT any server
 
-- Admin: **VINAY KHILERI** (the admin badge on the students page)
-- The admin panel (`admin.html`) logs in with the VINAY KHILERI admin account.
-- From the panel you can: publish/delete homework, scores, announcements, polls, and edit every student profile (bio / strengths / interests / goals). All changes persist in localStorage.
+Open the **Sync Center** (⟳ button, bottom-left, on every page):
 
-## 🤖 Class AI
+- **Same phone, all tabs** — syncs instantly & automatically.
+- **Other phones / PCs** — three server-free ways:
+  1. **Sync code** — copy on one device, paste → Merge on the other.
+  2. **Sync file** — download `.json`, send it (WhatsApp etc.), import it.
+  3. **LIVE P2P link** — WebRTC data-channel with copy/paste codes. Stays
+     live while both pages are open. No accounts, no server (a public STUN
+     entry only helps NAT; same-WiFi works peer-to-peer).
 
-A fully offline smart assistant that answers from the class knowledge base:
-- **Study Bot** — teachers, students, subjects (photosynthesis, gravity, Newton's laws, quadratic equations, Pythagoras, cells, acids & bases, electricity, trigonometry), announcements, scores, polls
-- **Homework Bot** — what's due, all homework
-- **Quiz Bot** — 5-question MCQ quizzes with instant feedback & scoring
+What syncs: class chat, comments, polls + votes, homework, announcements,
+scores, profiles, subject notes + photos, theme, AI config, presence.
+Merging is **additive & safe** — syncing never deletes anything on your device.
+(Admin deletes are local-only by design.)
 
-## ✨ Mascots — Vinay & Nitin
+Deployed with `server.js`? It acts as an extra merge hub (merge, never
+overwrite). The site never *needs* it.
 
-Two tiny interactive buddies sit at the bottom of every page:
+## 🧍 Mascots — Vinay & Nitin (classic stickmen)
 
-- **VINAY** 😎 — the cool one: sparkles, spins, dances, epic one-liners
-- **NITIN** 📋 — the classy admin one: glasses & tie, keeps the register
+Two **classic thin-line stickmen** living at the bottom of every page, animated
+by a procedural rig (IK limbs, springy head, squash & stretch):
 
-They wave, jump, dance, sleep, spin and talk random class lines. **Click them** for a reaction!
+- **VINAY** 💜 — violet, sporty headband, the cool one
+- **NITIN** 💚 — teal, glasses + tie, the classy admin one
+
+They breathe, blink, watch your cursor, wander, wave, dance, yawn, high-five —
+**click them, double-click for a dance, or GRAB & THROW them** (mouse + touch).
+They celebrate your votes and chat messages. Hide/show via the ◠‿◠ button.
+
+## 📱 Smartphone ready
+
+Bottom tabbar with safe-area insets, 44px+ touch targets, bottom-sheet modals,
+sticky chat input, 16px inputs (no iOS zoom), compressed photo uploads,
+battery-friendly canvases (pause off-screen), works 360px → 4K.
+
+## ✨ Effects
+
+Scroll-progress bar, page transitions, staggered reveals, spotlight cards,
+constellation particles, aurora blobs, physics confetti, marquee ticker,
+magnetic buttons, 3D tilt, toasts, typing indicators — all hand-written,
+all `prefers-reduced-motion` safe.
 
 ## 🛠 Tech
 
-- 100% static: HTML + CSS + vanilla JS, no frameworks, no build step
-- All data seeded from `data/seed.js` (original site content) into localStorage
-- Hand-written animations: particle hero, aurora blobs, scroll reveals, magnetic buttons, 3D tilt cards, animated counters, confetti, toasts, marquee
-- Fully responsive + `prefers-reduced-motion` support
-- Footer credit: **Made by Vinay &amp; Nitin 👌**
+- 100% static: HTML + CSS + vanilla JS. Data seeded from `seed.js` → localStorage
+- `data.js` storage layer (stable IDs, quota-safe writes), `sync-bridge.js`
+  serverless sync engine, `stickmen.js` procedural animation engine
+- Optional `server.js` merge hub for deploys (`npm start`)
 
 ## 🔄 Reset
 
-Admin panel → Settings → "Reset All Data to Seed" restores the original scraped content.
+Admin panel → Settings → "Reset All Data to Seed" (local device only).
 
 ---
 © 2026 AIA Class 10-A Hub. Built with ❤ for Class 10-A by **Vinay & Nitin 👌**

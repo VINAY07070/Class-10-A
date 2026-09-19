@@ -1,8 +1,10 @@
 /* ============================================
-   Student Chat — class chatroom
-   Login with student credentials, messages
-   show the student's real name only.
-   Per-user privacy: admin has an admin view.
+   Student Chat — REAL class group chatroom
+   Everyone sees everyone's messages, live.
+   Syncs serverlessly: tabs instantly, other
+   devices via Sync Center (code/file/P2P).
+   Typing indicators · date dividers · delete
+   own (admin: delete any + clear all).
    ============================================ */
 
 (function () {
@@ -22,8 +24,16 @@
   var logoutBtn = document.getElementById('chatLogoutBtn');
   var adminToggle = document.getElementById('adminViewToggle');
 
+  /* typing indicator row (injected) */
+  var typingEl = document.createElement('div');
+  typingEl.className = 'chat-typing';
+  typingEl.id = 'chatTyping';
+  messagesEl.parentNode.insertBefore(typingEl, messagesEl.nextSibling);
+
   var session = DataStore.getSession();
-  var adminView = false;
+  var typingMap = {};
+  var typingTimer = 0, lastTyped = 0;
+  var pollTimer = 0, lastKnownLen = -1, lastKnownTail = '';
 
   /* ---------- login handling ---------- */
   function tryLogin() {
@@ -38,17 +48,27 @@
     DataStore.setSession(auth);
     session = DataStore.getSession();
     enterChat();
+    App.showToast('Welcome to the chat, ' + auth.name.split(' ')[0] + '! 💬', 'success');
   }
 
   function enterChat() {
+    if (!session) { loginBox.style.display = 'block'; appEl.style.display = 'none'; return; }
     loginBox.style.display = 'none';
     appEl.style.display = 'block';
-    loggedAsEl.textContent = 'Chatting as ' + session.name;
     var isAdmin = session.role === 'admin';
-    adminToggle.style.display = isAdmin ? '' : 'none';
-    adminView = false;
-    adminToggle.querySelector('span').textContent = 'Admin view';
-    renderMessages();
+    loggedAsEl.innerHTML = 'Chatting as <strong>' + App.escapeHtml(session.name) + '</strong>' +
+      (isAdmin ? ' <span class="session-role">ADMIN</span>' : '') +
+      '<span class="chat-online-dot" title="Live"></span>';
+    /* admin: repurpose the toggle as "Clear ALL chat" */
+    if (adminToggle) {
+      if (isAdmin) {
+        adminToggle.style.display = '';
+        adminToggle.innerHTML = '<i class="fa-solid fa-trash"></i> <span>Clear all</span>';
+      } else adminToggle.style.display = 'none';
+    }
+    if (clearBtn) clearBtn.innerHTML = '<i class="fa-solid fa-broom"></i> Clear mine';
+    startLive();
+    renderMessages(true);
   }
 
   function leaveChat() {
@@ -57,56 +77,96 @@
   }
 
   /* ---------- render ---------- */
-  function renderMessages() {
-    var msgs = DataStore.getClassChat();
-    var showAll = adminView && session && session.role === 'admin';
-    var visible = msgs.filter(function (m) {
-      if (showAll) return true;
-      // student view: only messages from this student + system info stays
-      if (!session) return false;
-      if (m.system) return true;
-      return m.username === session.username;
-    });
+  function esc(s) { return App.escapeHtml(s); }
+  function dayLabel(iso) {
+    var d = new Date(iso), now = new Date();
+    var dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var td = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var diff = Math.round((td - dd) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    return App.formatDate(iso);
+  }
+
+  function renderMessages(forceScroll) {
+    var msgs = DataStore.getClassChat() || [];
+    lastKnownLen = msgs.length;
+    lastKnownTail = msgs.length ? (msgs[msgs.length - 1].id || msgs[msgs.length - 1].at) : '';
+    /* preserve scroll so live updates never yank readers to the top */
+    var prevTop = messagesEl.scrollTop;
+    var wasBottom = forceScroll || nearBottom();
     messagesEl.innerHTML = '';
-    if (!visible.length) {
+    if (!msgs.length) {
       var empty = document.createElement('div');
       empty.className = 'chat-empty';
-      if (showAll) {
-        empty.innerHTML = '<div class="empty-icon">🗒️</div><p>No messages from anyone yet.<br><span class="text-muted">Admin view shows every student\'s messages.</span></p>';
-      } else {
-        empty.innerHTML = '<div class="empty-icon">💬</div><p>No messages yet.<br><span class="text-muted">Send the first hello!</span></p>';
-      }
+      empty.innerHTML = '<div class="empty-icon">💬</div><p>No messages yet.<br><span class="text-muted">Say hi — everyone in 10-A will see it!</span></p>';
       messagesEl.appendChild(empty);
       return;
     }
-    visible.forEach(function (m) {
-      messagesEl.appendChild(buildMessage(m, showAll));
+    var lastDay = '';
+    var isAdmin = session && session.role === 'admin';
+    msgs.forEach(function (m, i) {
+      if (m.system) {
+        var sys = document.createElement('div');
+        sys.className = 'chat-system';
+        sys.textContent = m.content;
+        messagesEl.appendChild(sys);
+        return;
+      }
+      var day = dayLabel(m.at || Date.now());
+      if (day !== lastDay) {
+        lastDay = day;
+        var div = document.createElement('div');
+        div.className = 'chat-day';
+        div.textContent = day;
+        messagesEl.appendChild(div);
+      }
+      var mine = session && m.username === session.username;
+      var wrap = document.createElement('div');
+      wrap.className = 'chat-msg' + (mine ? ' mine' : '');
+      /* group consecutive messages from same author */
+      var prev = msgs[i - 1];
+      if (prev && !prev.system && prev.username === m.username && dayLabel(prev.at) === day) wrap.classList.add('grouped');
+      var canDel = mine || isAdmin;
+      wrap.innerHTML =
+        '<div class="chat-msg-meta"><span class="chat-msg-author">' + esc(m.name || 'Unknown') + '</span>' +
+        (isAdmin && m.username ? '<span class="chat-msg-user">@' + esc(m.username) + '</span>' : '') +
+        '<span class="chat-msg-time">' + App.timeAgo(m.at) + '</span>' +
+        (canDel ? '<button class="chat-del" data-id="' + esc(m.id || '') + '" title="Delete">✕</button>' : '') +
+        '</div><div class="chat-msg-body">' + esc(m.content) + '</div>';
+      messagesEl.appendChild(wrap);
     });
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    messagesEl.querySelectorAll('.chat-del').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        deleteMessage(btn.getAttribute('data-id'));
+      });
+    });
+    messagesEl.scrollTop = wasBottom ? messagesEl.scrollHeight : Math.min(prevTop, messagesEl.scrollHeight);
+  }
+  function nearBottom() {
+    return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
   }
 
-  function buildMessage(m, showAll) {
-    var div = document.createElement('div');
-    if (m.system) {
-      div.className = 'chat-system';
-      div.textContent = m.content;
-      return div;
-    }
-    var mine = session && m.username === session.username;
-    div.className = 'chat-msg' + (mine ? ' mine' : '');
-    if (showAll && !mine) div.className += ' admin-seen';
-    var meta = '<div class="chat-msg-meta"><span class="chat-msg-author">' + App.escapeHtml(m.name) + '</span>' +
-      (showAll ? '<span class="chat-msg-user">@' + App.escapeHtml(m.username) + '</span>' : '') +
-      '<span class="chat-msg-time">' + App.timeAgo(m.at) + '</span></div>';
-    var body = '<div class="chat-msg-body">' + App.escapeHtml(m.content) + '</div>';
-    div.innerHTML = meta + body;
-    return div;
+  function deleteMessage(id) {
+    if (!id) return;
+    var msgs = DataStore.getClassChat();
+    var idx = -1;
+    for (var i = 0; i < msgs.length; i++) if (msgs[i].id === id) { idx = i; break; }
+    if (idx < 0) return;
+    var m = msgs[idx];
+    var isAdmin = session && session.role === 'admin';
+    if (!(isAdmin || (session && m.username === session.username))) return;
+    if (!isAdmin && !confirm('Delete this message?')) return;
+    msgs.splice(idx, 1);
+    DataStore.setClassChat(msgs);
+    renderMessages(false);
   }
 
   /* ---------- send ---------- */
   function send() {
     var text = inputEl.value.trim();
     if (!text || !session) return;
+    if (text.length > 500) { App.showToast('Message too long (max 500)', 'error'); return; }
     DataStore.addClassChat({
       name: session.name,
       username: session.username,
@@ -114,47 +174,101 @@
       at: new Date().toISOString()
     });
     inputEl.value = '';
-    renderMessages();
+    inputEl.focus();
+    renderMessages(true);
+    try {
+      if (window.StickMen && Math.random() < 0.3) StickMen.celebrate();
+    } catch (e) {}
   }
+
+  /* ---------- typing indicators ---------- */
+  function broadcastTyping() {
+    if (!session || !window.AiaSync) return;
+    var now = Date.now();
+    if (now - lastTyped < 2500) return;
+    lastTyped = now;
+    window.AiaSync.typing(session.username, session.name);
+  }
+  document.addEventListener('aia-typing', function (e) {
+    var d = e.detail || {};
+    if (!d.user || (session && d.user === session.username)) return;
+    typingMap[d.user] = { name: d.name || 'Someone', at: Date.now() };
+    renderTyping();
+  });
+  function renderTyping() {
+    var now = Date.now();
+    var names = [];
+    Object.keys(typingMap).forEach(function (u) {
+      if (now - typingMap[u].at < 4000) names.push(typingMap[u].name.split(' ')[0]);
+      else delete typingMap[u];
+    });
+    if (!names.length) { typingEl.innerHTML = ''; typingEl.classList.remove('show'); return; }
+    typingEl.classList.add('show');
+    typingEl.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span> ' +
+      esc(names.slice(0, 3).join(', ')) + (names.length > 3 ? ' +' + (names.length - 3) : '') + ' typing…';
+  }
+  setInterval(renderTyping, 1500);
+
+  /* ---------- live updates (sync events + storage + poll fallback) ---------- */
+  function onRemote() {
+    var msgs = DataStore.getClassChat() || [];
+    var tail = msgs.length ? (msgs[msgs.length - 1].id || msgs[msgs.length - 1].at) : '';
+    if (msgs.length !== lastKnownLen || tail !== lastKnownTail) renderMessages(false);
+  }
+  /* keep "x minutes ago" fresh without rebuilding the DOM constantly */
+  setInterval(function () {
+    if (appEl.style.display !== 'none' && document.visibilityState === 'visible') renderMessages(false);
+  }, 60000);
+  function startLive() {
+    if (pollTimer) return;
+    window.addEventListener('aia-sync', onRemote);
+    document.addEventListener('aia-data-change', function (e) {
+      if (!e.detail || e.detail.key === '*' || e.detail.key === 'aia_class_chat') onRemote();
+    });
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'aia_class_chat') onRemote();
+    });
+    pollTimer = setInterval(onRemote, 2500); /* file:// fallback where events may lag */
+  }
+  window.__aiaRefresh = function () { if (appEl.style.display !== 'none') onRemote(); };
 
   /* ---------- events ---------- */
   if (loginBtn) loginBtn.addEventListener('click', tryLogin);
   if (passInput) passInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') tryLogin(); });
   if (userInput) userInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') passInput.focus(); });
   if (sendBtn) sendBtn.addEventListener('click', send);
-  if (inputEl) inputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
+  if (inputEl) {
+    inputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
+    inputEl.addEventListener('input', broadcastTyping);
+  }
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
-      var msgs = DataStore.getClassChat();
-      var kept = msgs.filter(function (m) { return m.system || m.username !== session.username; });
+      if (!session) return;
+      if (!confirm('Delete YOUR messages from this chat?')) return;
+      var kept = DataStore.getClassChat().filter(function (m) { return m.system || m.username !== session.username; });
       DataStore.setClassChat(kept);
       App.showToast('Your messages were cleared', 'info');
-      renderMessages();
+      renderMessages(false);
+    });
+  }
+  if (adminToggle) {
+    adminToggle.addEventListener('click', function () {
+      if (!session || session.role !== 'admin') return;
+      if (!confirm('ADMIN: delete ALL chat messages for everyone?')) return;
+      DataStore.setClassChat([]);
+      App.showToast('Chat cleared', 'info');
+      renderMessages(false);
     });
   }
   if (logoutBtn) logoutBtn.addEventListener('click', leaveChat);
-  if (adminToggle) {
-    adminToggle.addEventListener('click', function () {
-      adminView = !adminView;
-      adminToggle.querySelector('span').textContent = adminView ? 'My view' : 'Admin view';
-      renderMessages();
-    });
-  }
-
-  /* cross-tab live update (nice touch: storage events) */
-  window.addEventListener('storage', function (e) {
-    if (e.key && (e.key.indexOf('aia_class_chat') === 0 || e.key === DataStore.KEYS.classChat)) {
-      renderMessages();
-    }
-  });
 
   /* ---------- boot ---------- */
-  if (session && session.role === 'student') {
-    enterChat();
-  } else if (session && session.role === 'admin') {
+  if (session && (session.role === 'student' || session.role === 'admin')) {
     enterChat();
   } else {
-    // visitor or no session → show login box, prefill if session has student creds
     loginBox.style.display = 'block';
+    if (session && session.name) {
+      try { userInput.value = ''; } catch (e) {}
+    }
   }
 })();

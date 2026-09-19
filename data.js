@@ -42,12 +42,34 @@ var DataStore = (function () {
       return fallback;
     }
   }
+  /* Quota-safe write. Returns true on success. Notifies the serverless
+     sync engine (sync-bridge.js) so tabs/devices stay in sync. */
   function _set(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
       console.warn('LocalStorage write failed:', e);
+      try { document.dispatchEvent(new CustomEvent('aia-quota', { detail: { key: key } })); } catch (e2) {}
+      return false;
     }
+    if (!window.__aiaApplying) {
+      try { document.dispatchEvent(new CustomEvent('aia-local-write', { detail: { key: key } })); } catch (e) {}
+    }
+    try { window.dispatchEvent(new Event('aia-sync')); } catch (e) {}
+    return true;
+  }
+  /* Stable unique ids — required for serverless merge (no dupes). */
+  function _uid(p) {
+    return (p || 'id') + '_' + Date.now().toString(36) + Math.floor(Math.random() * 46656).toString(36);
+  }
+  function _stamp(obj, prefix) {
+    if (obj && typeof obj === 'object') {
+      if (!obj.id) obj.id = _uid(prefix);
+      var now = new Date().toISOString();
+      if (!obj.created_at) obj.created_at = now;
+      obj.updatedAt = now;
+    }
+    return obj;
   }
 
   /* ---------- seed collections ---------- */
@@ -57,9 +79,11 @@ var DataStore = (function () {
   function setStudentProfiles(v) { _set(KEYS.studentProfiles, v); }
   function saveProfile(name, fields) {
     var profiles = getStudentProfiles();
-    var idx = profiles.findIndex(function (p) { return p.student_name.toUpperCase() === name.toUpperCase(); });
+    var idx = profiles.findIndex(function (p) { return String(p.student_name || '').toUpperCase() === String(name).toUpperCase(); });
     var entry = Object.assign({ student_name: name }, fields);
-    if (idx >= 0) profiles[idx] = entry; else profiles.push(entry);
+    entry.updatedAt = new Date().toISOString();
+    if (idx >= 0) { entry.id = profiles[idx].id || _uid('prof'); profiles[idx] = entry; }
+    else { entry.id = _uid('prof'); profiles.push(entry); }
     setStudentProfiles(profiles);
   }
   function getTeachers() { return _get(KEYS.teachers, (window.SEED && window.SEED.teachers) || []); }
@@ -68,31 +92,40 @@ var DataStore = (function () {
   function setLeadership(v) { _set(KEYS.leadership, v); }
   function getHomework() { return _get(KEYS.homework, (window.SEED && window.SEED.homework) || []); }
   function setHomework(v) { _set(KEYS.homework, v); }
-  function addHomework(item) { var l = getHomework(); l.unshift(item); setHomework(l); return l.length - 1; }
-  function deleteHomework(i) { var l = getHomework(); l.splice(i, 1); setHomework(l); rebuildCommentKeys('hw_'); }
+  function addHomework(item) { _stamp(item, 'hw'); var l = getHomework(); l.unshift(item); setHomework(l); return 0; }
+  function deleteHomework(i) { var l = getHomework(); l.splice(i, 1); setHomework(l); rebuildCommentKeys('hw_', i); }
   function getAnnouncements() { return _get(KEYS.announcements, (window.SEED && window.SEED.announcements) || []); }
   function setAnnouncements(v) { _set(KEYS.announcements, v); }
   function addAnnouncement(item) {
-    if (!item.created_at) item.created_at = new Date().toISOString();
-    if (!item.date) item.date = new Date().toISOString();
-    var l = getAnnouncements(); l.unshift(item); setAnnouncements(l); return l.length - 1;
+    _stamp(item, 'ann');
+    if (!item.date) item.date = item.created_at;
+    var l = getAnnouncements(); l.unshift(item); setAnnouncements(l); return 0;
   }
-  function deleteAnnouncement(i) { var l = getAnnouncements(); l.splice(i, 1); setAnnouncements(l); rebuildCommentKeys('ann_'); }
+  function deleteAnnouncement(i) { var l = getAnnouncements(); l.splice(i, 1); setAnnouncements(l); rebuildCommentKeys('ann_', i); }
   function getPolls() { return _get(KEYS.polls, (window.SEED && window.SEED.polls) || []); }
   function setPolls(v) { _set(KEYS.polls, v); }
   function addPoll(item) {
-    if (!item.created_at) item.created_at = new Date().toISOString();
+    _stamp(item, 'poll');
     item._voteCounts = item._voteCounts || {};
-    var l = getPolls(); l.unshift(item); setPolls(l); return l.length - 1;
+    item._votes = item._votes || {};
+    var l = getPolls(); l.unshift(item); setPolls(l); return 0;
   }
   function deletePoll(i) {
     var l = getPolls(); l.splice(i, 1); setPolls(l);
-    var votes = _get(KEYS.pollVotes, {}); delete votes['poll_' + i]; _set(KEYS.pollVotes, votes);
-    var keys = Object.keys(votes); _set(KEYS.pollVotes, keys.length ? votes : {});
+    /* re-index local vote flags so later polls keep their flags */
+    var votes = _get(KEYS.pollVotes, {}), next = {};
+    Object.keys(votes).forEach(function (k) {
+      var m = /^poll_(\d+)$/.exec(k);
+      if (!m) { next[k] = votes[k]; return; }
+      var idx = parseInt(m[1], 10);
+      if (idx === i) return;
+      next['poll_' + (idx > i ? idx - 1 : idx)] = votes[k];
+    });
+    _set(KEYS.pollVotes, next);
   }
   function getTestScores() { return _get(KEYS.testScores, (window.SEED && window.SEED.test_scores) || []); }
   function setTestScores(v) { _set(KEYS.testScores, v); }
-  function addTestScore(item) { var l = getTestScores(); l.unshift(item); setTestScores(l); return l.length - 1; }
+  function addTestScore(item) { _stamp(item, 'score'); var l = getTestScores(); l.unshift(item); setTestScores(l); return 0; }
   function deleteTestScore(i) { var l = getTestScores(); l.splice(i, 1); setTestScores(l); }
 
   /* ---------- comments ---------- */
@@ -100,46 +133,75 @@ var DataStore = (function () {
   function addComment(key, author, text) {
     var all = _get(KEYS.comments, {});
     if (!all[key]) all[key] = [];
-    all[key].push({ author: author, text: text, at: new Date().toISOString() });
+    all[key].push({ id: _uid('cm'), author: author, text: text, at: new Date().toISOString() });
+    if (all[key].length > 200) all[key] = all[key].slice(-200);
     _set(KEYS.comments, all);
   }
   function deleteComment(key, idx) {
     var all = _get(KEYS.comments, {});
     if (all[key] && all[key][idx]) { all[key].splice(idx, 1); _set(KEYS.comments, all); }
   }
-  function rebuildCommentKeys(prefix) {
+  /* FIX: only comments AFTER the deleted item shift down; the deleted
+     item's own thread is dropped, earlier ones keep their keys. */
+  function rebuildCommentKeys(prefix, deletedIdx) {
+    deletedIdx = (typeof deletedIdx === 'number') ? deletedIdx : -1;
     var all = _get(KEYS.comments, {});
     var next = {};
     Object.keys(all).forEach(function (k) {
       if (k.indexOf(prefix) !== 0) { next[k] = all[k]; return; }
       var idx = parseInt(k.slice(prefix.length), 10);
-      if (!isNaN(idx)) next[prefix + (idx - 1)] = all[k];
+      if (isNaN(idx)) { next[k] = all[k]; return; }
+      if (idx === deletedIdx) return;                    /* dropped with item */
+      if (idx > deletedIdx) next[prefix + (idx - 1)] = all[k];
+      else next[k] = all[k];
     });
     _set(KEYS.comments, next);
   }
 
-  /* ---------- polls ---------- */
-  function votePoll(pollIdx, optIdx) {
-    if (hasVotedPoll(pollIdx)) return false;
+  /* ---------- polls (voter-map: one vote per user, merges across devices) ---------- */
+  function pollUid(pollIdx) {
+    var p = getPolls()[pollIdx];
+    if (!p) return 'poll_' + pollIdx;
+    return p.id ? 'p_' + p.id : 'poll_' + pollIdx;
+  }
+  function votePoll(pollIdx, optIdx, username) {
+    if (hasVotedPoll(pollIdx, username)) return false;
     var polls = getPolls();
     var poll = polls[pollIdx]; if (!poll) return false;
-    var counts = poll._voteCounts || {};
-    counts[optIdx] = (counts[optIdx] || 0) + 1;
-    poll._voteCounts = counts;
+    poll._votes = poll._votes || {};
+    poll._voteCounts = poll._voteCounts || {};
+    var who = username || ('anon_' + Math.random().toString(36).slice(2, 9));
+    poll._votes[who] = optIdx;
+    poll._voteCounts[optIdx] = (poll._voteCounts[optIdx] || 0) + 1;
+    poll.updatedAt = new Date().toISOString();
     setPolls(polls);
     var votes = _get(KEYS.pollVotes, {});
-    votes['poll_' + pollIdx] = optIdx;
+    votes[pollUid(pollIdx)] = optIdx;
+    votes['poll_' + pollIdx] = optIdx; /* legacy positional flag */
     _set(KEYS.pollVotes, votes);
     return true;
   }
-  function hasVoted(pollIdx, optIdx) {
-    var votes = _get(KEYS.pollVotes, {});
-    return votes['poll_' + pollIdx] === optIdx;
+  function pollCounts(poll) {
+    /* derive counts: voter-map first, legacy counts as floor */
+    var counts = {}, i;
+    (poll.options || []).forEach(function (o, oi) { counts[oi] = 0; });
+    Object.keys(poll._voteCounts || {}).forEach(function (k) { counts[k] = Math.max(counts[k] || 0, poll._voteCounts[k] || 0); });
+    var fromMap = {};
+    Object.keys(poll._votes || {}).forEach(function (u) { var o = poll._votes[u]; fromMap[o] = (fromMap[o] || 0) + 1; });
+    Object.keys(fromMap).forEach(function (k) { counts[k] = Math.max(counts[k] || 0, fromMap[k]); });
+    return counts;
   }
-  function hasVotedPoll(pollIdx) {
+  function myPollVote(pollIdx, username) {
+    var polls = getPolls(), poll = polls[pollIdx];
+    if (poll && username && poll._votes && typeof poll._votes[username] === 'number') return poll._votes[username];
     var votes = _get(KEYS.pollVotes, {});
-    return typeof votes['poll_' + pollIdx] === 'number';
+    var v = votes[pollUid(pollIdx)];
+    if (typeof v === 'number') return v;
+    v = votes['poll_' + pollIdx];
+    return (typeof v === 'number') ? v : null;
   }
+  function hasVoted(pollIdx, optIdx, username) { return myPollVote(pollIdx, username) === optIdx; }
+  function hasVotedPoll(pollIdx, username) { return myPollVote(pollIdx, username) !== null; }
 
   /* ---------- unlock / admin auth ---------- */
   function isUnlocked() { return _get(KEYS.unlocked, false) === true; }
@@ -201,7 +263,11 @@ var DataStore = (function () {
   /* ---------- class chat ---------- */
   function getClassChat() { return _get(KEYS.classChat, []); }
   function addClassChat(msg) {
-    var l = getClassChat(); l.push(msg); _set(KEYS.classChat, l); return l;
+    if (!msg.id) msg.id = _uid('msg');
+    if (!msg.at) msg.at = new Date().toISOString();
+    var l = getClassChat(); l.push(msg);
+    if (l.length > 500) l = l.slice(-500);
+    _set(KEYS.classChat, l); return l;
   }
   function setClassChat(l) { _set(KEYS.classChat, l); }
   function deleteClassChat(idx) { var l = getClassChat(); l.splice(idx, 1); setClassChat(l); }
@@ -211,7 +277,8 @@ var DataStore = (function () {
   function getAiHistory(username) { return _get(aiKey(username), []); }
   function addAiMessage(username, role, content) {
     var l = getAiHistory(username);
-    l.push({ role: role, content: content, at: new Date().toISOString() });
+    l.push({ id: _uid('aim'), role: role, content: content, at: new Date().toISOString() });
+    if (l.length > 120) l = l.slice(-120);
     _set(aiKey(username), l);
     var glob = getAiLog();
     glob.push({ user: username, role: role, content: content, at: new Date().toISOString() });
@@ -273,12 +340,16 @@ var DataStore = (function () {
   }
   function getSubjectContent() { return _get(KEYS.subjectContent, {}); }
   function setSubjectContent(name, data) {
-    var all = getSubjectContent(); all[name] = data; _set(KEYS.subjectContent, all);
+    data.updatedAt = new Date().toISOString();
+    var all = getSubjectContent(); all[name] = data; return _set(KEYS.subjectContent, all);
   }
   function getSubjectContentFor(name) { return _get(KEYS.subjectContent, {})[name] || null; }
   function getSubjectPhotos() { return _get(KEYS.subjectPhotos, {}); }
   function setSubjectPhoto(name, photos) {
-    var all = getSubjectPhotos(); all[name] = photos; _set(KEYS.subjectPhotos, all);
+    var all = getSubjectPhotos(); all[name] = (photos || []).slice(-24);
+    var ok = _set(KEYS.subjectPhotos, all);
+    if (ok) { try { localStorage.setItem('aia_subject_photos_at_' + name, new Date().toISOString()); } catch (e) {} }
+    return ok;
   }
   function getSubjectPhotoList(name) { return _get(KEYS.subjectPhotos, {})[name] || []; }
 
@@ -307,6 +378,9 @@ var DataStore = (function () {
     if (THEMES.indexOf(t) === -1) t = 'glass';
     try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
     document.documentElement.setAttribute('data-theme', t);
+    if (!window.__aiaApplying) {
+      try { document.dispatchEvent(new CustomEvent('aia-local-write', { detail: { key: THEME_KEY } })); } catch (e) {}
+    }
     return t;
   }
 
@@ -315,20 +389,34 @@ var DataStore = (function () {
     var out = {};
     [KEYS.students, KEYS.studentProfiles, KEYS.teachers, KEYS.leadership, KEYS.homework,
      KEYS.announcements, KEYS.polls, KEYS.testScores, KEYS.comments, KEYS.pollVotes,
-     KEYS.classChat, KEYS.activityLog, KEYS.subjectContent, KEYS.subjectPhotos,
-     KEYS.githubData, KEYS.aiConfig].forEach(function (k) {
-      var v = localStorage.getItem(k);
-      if (v) out[k] = JSON.parse(v);
+     KEYS.classChat, KEYS.activityLog, KEYS.presence, KEYS.aiLog,
+     KEYS.subjectContent, KEYS.subjectPhotos,
+     KEYS.githubData, KEYS.aiConfig, 'aia_credentials_overrides'].forEach(function (k) {
+      try {
+        var v = localStorage.getItem(k);
+        if (v) out[k] = JSON.parse(v);
+      } catch (e) {}
     });
+    try { out.aia_theme = localStorage.getItem('aia_theme') || 'glass'; } catch (e) {}
     out._exported_at = new Date().toISOString();
     return JSON.stringify(out, null, 2);
   }
   function importAll(jsonStr) {
     var data = JSON.parse(jsonStr);
+    /* Accept both raw backups and AIA2 sync snapshots — merge safely. */
+    if (data && data.data && !data.aia_homework) {
+      if (window.AiaSync) { window.AiaSync.mergeSnapshot(data); return true; }
+      data = data.data;
+    }
     Object.keys(data).forEach(function (k) {
       if (k === '_exported_at') return;
-      localStorage.setItem(k, JSON.stringify(data[k]));
+      try {
+        if (k === 'aia_theme' && typeof data[k] === 'string') { setTheme(data[k]); return; }
+        localStorage.setItem(k, JSON.stringify(data[k]));
+      } catch (e) {}
     });
+    try { document.dispatchEvent(new CustomEvent('aia-data-change', { detail: { key: '*' } })); } catch (e) {}
+    try { window.dispatchEvent(new Event('aia-sync')); } catch (e) {}
     return true;
   }
 
@@ -385,6 +473,7 @@ var DataStore = (function () {
     getTestScores: getTestScores, setTestScores: setTestScores, addTestScore: addTestScore, deleteTestScore: deleteTestScore,
     getComments: getComments, addComment: addComment, deleteComment: deleteComment,
     votePoll: votePoll, hasVoted: hasVoted, hasVotedPoll: hasVotedPoll,
+    pollCounts: pollCounts, myPollVote: myPollVote, uid: _uid,
     isUnlocked: isUnlocked, setUnlocked: setUnlocked,
     getAdminAuth: getAdminAuth, setAdminAuth: setAdminAuth, isAdminAuthed: isAdminAuthed, isFullAdmin: isFullAdmin, verifyPass: verifyPass,
     getSession: getSession, setSession: setSession, clearSession: clearSession, isLoggedIn: isLoggedIn, isAdminUser: isAdminUser,

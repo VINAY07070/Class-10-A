@@ -37,12 +37,26 @@ var App = (function () {
     initParallax();
     initParticles('heroCanvas');
     initParticles('loginCanvas');
+    initScrollProgress();
+    initSpotlight();
+    initPageTransitions();
+    initQuotaNotice();
     App.initRipple();
+    App.observeReveals(document);
     if (!locked) initStickMen();
     logVisit(activePage);
 
     // exchange student/visitor session chip
     updateSessionChip();
+
+    // live re-render hooks for serverless sync (pages opt-in via window.__aiaRefresh)
+    window.addEventListener('aia-sync', function () {
+      try { if (typeof window.__aiaRefresh === 'function') window.__aiaRefresh(); } catch (e) {}
+      App.observeReveals(document);
+    });
+    document.addEventListener('aia-data-change', function () {
+      try { if (typeof window.__aiaRefresh === 'function') window.__aiaRefresh(); } catch (e) {}
+    });
   }
 
   function logVisit(page) {
@@ -385,19 +399,25 @@ var App = (function () {
     var canvas = document.getElementById(canvasId);
     if (!canvas) return;
     var ctx = canvas.getContext('2d');
-    var w, h, particles = [];
+    if (!ctx) return;
+    var w, h, particles = [], raf = 0, running = true;
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var smallScreen = Math.min(window.innerWidth, window.innerHeight) < 700;
     var mouse = { x: -9999, y: -9999 };
     var PALETTE = ['124,108,255', '56,224,255', '79,140,255', '245,181,68', '255,110,199'];
+    var DPR = Math.min(window.devicePixelRatio || 1, smallScreen ? 1.5 : 2);
 
     function resize() {
-      w = canvas.width = canvas.offsetWidth;
-      h = canvas.height = canvas.offsetHeight;
+      w = canvas.offsetWidth; h = canvas.offsetHeight;
+      canvas.width = Math.max(1, Math.floor(w * DPR));
+      canvas.height = Math.max(1, Math.floor(h * DPR));
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     }
     resize();
     window.addEventListener('resize', resize);
 
-    var count = reduced ? 16 : Math.min(85, Math.floor(w * h / 13000));
+    var density = smallScreen ? 26000 : 13000;
+    var count = reduced ? 14 : Math.min(smallScreen ? 42 : 85, Math.floor(w * h / density));
     for (var i = 0; i < count; i++) {
       particles.push({
         x: Math.random() * w,
@@ -412,17 +432,52 @@ var App = (function () {
       });
     }
 
-    canvas.addEventListener('mousemove', function (e) {
-      var rect = canvas.getBoundingClientRect();
-      mouse.x = e.clientX - rect.left;
-      mouse.y = e.clientY - rect.top;
+    var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (finePointer) {
+      canvas.addEventListener('mousemove', function (e) {
+        var rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+      });
+      canvas.addEventListener('mouseleave', function () {
+        mouse.x = -9999; mouse.y = -9999;
+      });
+    }
+    /* pause when tab hidden or canvas off-screen — big mobile battery win */
+    document.addEventListener('visibilitychange', function () {
+      var hide = document.hidden;
+      if (hide && running) { running = false; cancelAnimationFrame(raf); }
+      else if (!hide && !running) { running = true; raf = requestAnimationFrame(draw); }
     });
-    canvas.addEventListener('mouseleave', function () {
-      mouse.x = -9999; mouse.y = -9999;
-    });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver(function (en) {
+        var vis = en[0].isIntersecting;
+        if (vis && !running && !document.hidden) { running = true; raf = requestAnimationFrame(draw); }
+        else if (!vis && running) { running = false; cancelAnimationFrame(raf); }
+      }, { threshold: 0 }).observe(canvas);
+    }
 
     function draw(t) {
+      if (!running) return;
+      raf = requestAnimationFrame(draw);
       ctx.clearRect(0, 0, w, h);
+      /* faint constellation links (desktop only, cheap: capped pairs) */
+      if (!smallScreen && !reduced) {
+        ctx.lineWidth = 1;
+        var linked = 0;
+        for (var i = 0; i < particles.length && linked < 60; i++) {
+          for (var j = i + 1; j < particles.length && linked < 60; j++) {
+            var a = particles[i], b = particles[j];
+            var dx = a.x - b.x, dy = a.y - b.y;
+            var d2 = dx * dx + dy * dy;
+            if (d2 < 11000) {
+              ctx.strokeStyle = 'rgba(124,108,255,' + (0.14 * (1 - d2 / 11000)).toFixed(3) + ')';
+              ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+              linked++;
+            }
+          }
+        }
+      }
       particles.forEach(function (p) {
         var dxm = p.x - mouse.x, dym = p.y - mouse.y;
         var dm2 = dxm * dxm + dym * dym;
@@ -432,38 +487,98 @@ var App = (function () {
           p.y += (dym / dm) * 0.9;
         }
         p.x += p.dx; p.y += p.dy;
-        if (p.x < -8 || p.x > w + 8) p.dx *= -1;
-        if (p.y < -8 || p.y > h + 8) p.dy *= -1;
+        if (p.x < -8) p.x = w + 8; else if (p.x > w + 8) p.x = -8;
+        if (p.y < -8) p.y = h + 8; else if (p.y > h + 8) p.y = -8;
         var tw = p.alpha * (0.55 + 0.45 * Math.sin(t / 900 * p.twinkle + p.phase));
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(' + p.hue + ',' + Math.max(0.05, tw) + ')';
         ctx.fill();
       });
-      requestAnimationFrame(draw);
     }
-    requestAnimationFrame(draw);
+    raf = requestAnimationFrame(draw);
   }
 
   /* ==================================================================
-     SCROLL REVEAL
+     SCROLL REVEAL (unified: .reveal + [data-reveal] + [data-stagger])
+     Pages render content AFTER initShared, so a MutationObserver
+     auto-wires every reveal element added later. Nothing stays hidden.
      ================================================================== */
+  var revealObserver = null;
+  var revealFallbackTimer = 0;
   function initScrollReveal() {
-    var els = document.querySelectorAll('.reveal');
-    if (!els.length) return;
     if (!('IntersectionObserver' in window)) return; // no IO → everything stays visible
-    // Only hide when we can reliably reveal: animation is progressive enhancement.
-    els.forEach(function (el) { el.classList.add('pending'); });
-    var observer = new IntersectionObserver(function (entries) {
+    revealObserver = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
-          entry.target.classList.remove('pending');
-          entry.target.classList.add('visible');
-          observer.unobserve(entry.target);
+          var el = entry.target;
+          el.classList.remove('pending');
+          el.classList.add('visible', 'in');
+          revealObserver.unobserve(el);
         }
       });
-    }, { threshold: 0.08 });
-    els.forEach(function (el) { observer.observe(el); });
+    }, { threshold: 0.06, rootMargin: '0px 0px -4% 0px' });
+
+    // safety net: if anything is still pending after 3.5s (observer quirks,
+    // display:none parents, odd embeds), reveal it — never trap content.
+    clearTimeout(revealFallbackTimer);
+    revealFallbackTimer = setTimeout(function () {
+      document.querySelectorAll('.reveal.pending, [data-reveal].pending').forEach(function (el) {
+        el.classList.remove('pending');
+        el.classList.add('visible', 'in');
+      });
+    }, 3500);
+
+    // auto-wire dynamically injected content (page renders, sync updates)
+    if ('MutationObserver' in window && !initScrollReveal._mo) {
+      initScrollReveal._mo = new MutationObserver(function (muts) {
+        var found = false;
+        muts.forEach(function (m) {
+          m.addedNodes.forEach(function (n) {
+            if (n.nodeType !== 1) return;
+            if (n.classList && (n.classList.contains('reveal') || n.hasAttribute('data-reveal'))) { wireRevealEl(n); found = true; }
+            if (n.querySelectorAll) n.querySelectorAll('.reveal:not(.visible):not(.pending), [data-reveal]:not(.in):not(.pending)').forEach(function (el) { wireRevealEl(el); found = true; });
+          });
+        });
+        if (found) staggerize(document);
+      });
+      initScrollReveal._mo.observe(document.body, { childList: true, subtree: true });
+    }
+    staggerize(document);
+  }
+  function wireRevealEl(el) {
+    if (!revealObserver || el.classList.contains('visible') || el.classList.contains('in')) return;
+    /* above-the-fold elements: reveal on next frame for entrance cascade */
+    var r = el.getBoundingClientRect();
+    el.classList.add('pending');
+    revealObserver.observe(el);
+    if (r.top < window.innerHeight * 0.92 && r.bottom > -40) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          el.classList.remove('pending');
+          el.classList.add('visible', 'in');
+          if (revealObserver) revealObserver.unobserve(el);
+        });
+      });
+    }
+  }
+  function staggerize(root) {
+    /* [data-stagger] children cascade with incremental delay */
+    (root || document).querySelectorAll('[data-stagger]:not([data-stag-done])').forEach(function (group) {
+      group.setAttribute('data-stag-done', '1');
+      Array.prototype.forEach.call(group.children, function (child, i) {
+        child.style.transitionDelay = Math.min(i * 0.06, 0.6) + 's';
+        child.classList.add('reveal');
+        wireRevealEl(child);
+        setTimeout(function () { child.style.transitionDelay = ''; }, 1400 + i * 60);
+      });
+    });
+  }
+  function observeReveals(root) {
+    if (!revealObserver) return;
+    (root || document).querySelectorAll('.reveal:not(.visible):not(.pending)').forEach(wireRevealEl);
+    (root || document).querySelectorAll('[data-reveal]:not(.in):not(.pending)').forEach(wireRevealEl);
+    staggerize(root || document);
   }
 
   /* ==================================================================
@@ -567,24 +682,61 @@ var App = (function () {
   }
 
   /* ==================================================================
-     CONFETTI
+     CONFETTI — physics canvas burst (smooth on phones)
      ================================================================== */
-  function burstConfetti() {
-    var container = document.createElement('div');
-    container.className = 'confetti-container';
-    document.body.appendChild(container);
-    var colors = ['#f5a524', '#4f8cff', '#7c6cff', '#ff5d7a', '#34d399', '#38e0ff', '#ffd889'];
-    for (var i = 0; i < 56; i++) {
-      var piece = document.createElement('div');
-      piece.className = 'confetti-piece';
-      piece.style.left = (Math.random() * 90 + 5) + '%';
-      piece.style.top = (Math.random() * 25 - 25) + '%';
-      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
-      piece.style.animationDuration = (1.6 + Math.random() * 1.4) + 's';
-      piece.style.animationDelay = (Math.random() * 0.5) + 's';
-      container.appendChild(piece);
+  function burstConfetti(opts) {
+    opts = opts || {};
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var canvas = document.createElement('canvas');
+    canvas.className = 'confetti-canvas';
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(window.innerWidth * dpr);
+    canvas.height = Math.floor(window.innerHeight * dpr);
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    document.body.appendChild(canvas);
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    var W = window.innerWidth, H = window.innerHeight;
+    var ox = opts.x !== undefined ? opts.x : W / 2;
+    var oy = opts.y !== undefined ? opts.y : H * 0.32;
+    var colors = ['#f5a524', '#4f8cff', '#7c6cff', '#ff5d7a', '#34d399', '#38e0ff', '#ffd889', '#ff6ec7'];
+    var parts = [];
+    var n = Math.min(opts.count || 130, 220);
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, sp = 4 + Math.random() * 9;
+      parts.push({
+        x: ox, y: oy,
+        vx: Math.cos(a) * sp + (Math.random() - 0.5) * 3,
+        vy: Math.sin(a) * sp - 4 - Math.random() * 4,
+        w: 5 + Math.random() * 6, h: 7 + Math.random() * 7,
+        rot: Math.random() * Math.PI * 2, vr: (Math.random() - 0.5) * 0.35,
+        color: colors[(Math.random() * colors.length) | 0],
+        circle: Math.random() < 0.25,
+        life: 1
+      });
     }
-    setTimeout(function () { container.remove(); }, 3400);
+    var frames = 0, maxFrames = 200;
+    (function tick() {
+      frames++;
+      ctx.clearRect(0, 0, W, H);
+      var alive = false;
+      parts.forEach(function (p) {
+        p.vy += 0.32; p.vx *= 0.985; p.vy *= 0.992;
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        p.life -= 0.006;
+        if (p.y < H + 30 && p.life > 0) alive = true; else return;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6));
+        ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        if (p.circle) { ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2); ctx.fill(); }
+        else ctx.fillRect(-p.w / 2, -p.h / 2, p.w * (0.4 + 0.6 * Math.abs(Math.sin(p.rot * 2))), p.h);
+        ctx.restore();
+      });
+      if (alive && frames < maxFrames) requestAnimationFrame(tick);
+      else canvas.remove();
+    })();
   }
 
   /* ==================================================================
@@ -595,6 +747,8 @@ var App = (function () {
     if (!cards.length) return;
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
     cards.forEach(function (card) {
+      if (card.getAttribute('data-tilt-done') === '1') return;
+      card.setAttribute('data-tilt-done', '1');
       card.addEventListener('mousemove', function (e) {
         var rect = card.getBoundingClientRect();
         var x = e.clientX - rect.left;
@@ -617,6 +771,92 @@ var App = (function () {
   }
 
   /* ==================================================================
+     SCROLL PROGRESS BAR
+     ================================================================== */
+  function initScrollProgress() {
+    if (document.getElementById('scrollProgress')) return;
+    var bar = document.createElement('div');
+    bar.id = 'scrollProgress';
+    bar.className = 'scroll-progress';
+    document.body.appendChild(bar);
+    var ticking = false;
+    function update() {
+      ticking = false;
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      var p = max > 0 ? (window.scrollY / max) : 0;
+      bar.style.transform = 'scaleX(' + Math.min(1, Math.max(0, p)).toFixed(4) + ')';
+    }
+    window.addEventListener('scroll', function () {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    update();
+  }
+
+  /* ==================================================================
+     SPOTLIGHT HOVER — cursor-following glow on cards (desktop)
+     ================================================================== */
+  function initSpotlight() {
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    document.addEventListener('pointermove', function (e) {
+      var card = e.target.closest ? e.target.closest('.feature-card, .glass-card, .teacher-card, .subject-card, .student-card') : null;
+      if (!card) return;
+      var r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+      card.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+      if (!card.classList.contains('spotlit')) card.classList.add('spotlit');
+    }, { passive: true });
+  }
+
+  /* ==================================================================
+     PAGE TRANSITIONS — soft fade between pages
+     ================================================================== */
+  function initPageTransitions() {
+    document.body.classList.add('page-enter');
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { document.body.classList.add('page-entered'); });
+    });
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href');
+      if (!href || href.charAt(0) === '#' || a.target === '_blank' || e.metaKey || e.ctrlKey) return;
+      if (/^(https?:|mailto:|tel:)/.test(href)) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      e.preventDefault();
+      document.body.classList.add('page-leaving');
+      setTimeout(function () { window.location.href = href; }, 180);
+    });
+  }
+
+  /* ==================================================================
+     STORAGE QUOTA NOTICE — photos too big? tell the user, don't lose data
+     ================================================================== */
+  function initQuotaNotice() {
+    document.addEventListener('aia-quota', function () {
+      showToast('Storage full! Photos are too large — they were NOT saved. Use smaller images.', 'error');
+    });
+  }
+
+  /* ==================================================================
+     LOGIN SUBTITLE TYPEWRITER (index.html calls App.startLoginType)
+     ================================================================== */
+  var loginTypeTimer = 0;
+  function startLoginType() {
+    var el = document.getElementById('loginSub');
+    if (!el) return;
+    var text = 'Log in as a student or grab a visitor pass';
+    clearInterval(loginTypeTimer);
+    el.textContent = '';
+    var i = 0;
+    loginTypeTimer = setInterval(function () {
+      i++;
+      el.textContent = text.slice(0, i);
+      if (i >= text.length) clearInterval(loginTypeTimer);
+    }, 34);
+  }
+
+  /* ==================================================================
      UTILITIES
      ================================================================== */
   function escapeHtml(str) {
@@ -627,8 +867,8 @@ var App = (function () {
 
   function formatDate(isoStr) {
     if (!isoStr) return '';
-    var d = new Date(isoStr);
-    if (isNaN(d.getTime())) return '';
+    var d = parseDueDate(isoStr);
+    if (!d || isNaN(d.getTime())) return '';
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
@@ -685,7 +925,8 @@ var App = (function () {
      GSAP hero entrance (home)
      ================================================================== */
   function heroEntrance() {
-    if (!window.gsap) return;
+    if (!window.gsap) return; // CSS entrance fallback keeps content visible
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     var tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
     tl.from('.hero-eyebrow', { y: 24, opacity: 0, duration: 0.7 }, 0.15)
       .from('.hero-title .line-top', { xPercent: -14, opacity: 0, duration: 0.85 }, 0.35)
@@ -697,6 +938,8 @@ var App = (function () {
 
   function initParallax() {
     if (!window.gsap || !window.ScrollTrigger) return;
+    try { if (gsap.registerPlugin) gsap.registerPlugin(ScrollTrigger); } catch (e) {}
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     gsap.utils.toArray('[data-parallax]').forEach(function (el) {
       var amt = parseFloat(el.getAttribute('data-parallax')) || 0.18;
       gsap.to(el, {
@@ -714,6 +957,8 @@ var App = (function () {
     initShared: initShared,
     showToast: showToast,
     burstConfetti: burstConfetti,
+    observeReveals: observeReveals,
+    startLoginType: startLoginType,
     escapeHtml: escapeHtml,
     formatDate: formatDate,
     formatTime: formatTime,
@@ -724,10 +969,11 @@ var App = (function () {
     heroEntrance: heroEntrance,
     initParallax: initParallax,
     initStickMen: initStickMen,
+    initTiltCards: initTiltCards,
     initRipple: function () {
       document.addEventListener('click', function (e) {
-        var el = e.target.closest('.btn, .tabbar-link, .quick-link');
-        if (!el) return;
+        var el = e.target.closest('.btn, .tabbar-item, .quick-link, .admin-tab, .subject-pill, .poll-option, .suggest-chip');
+        if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         var rect = el.getBoundingClientRect();
         var rip = document.createElement('span');
         rip.className = 'ripple';

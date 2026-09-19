@@ -67,6 +67,35 @@
     }).join('');
   }
 
+  /* --- Live stats counters --- */
+  function fillStats() {
+    var map = {
+      statStudents: DataStore.getStudentCount(),
+      statTeachers: DataStore.getTeacherCount(),
+      statHomework: DataStore.getHomeworkCount(),
+      statChat: DataStore.getClassChat().length
+    };
+    Object.keys(map).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.setAttribute('data-count', map[id]);
+      /* if the counter already ran, just update the number */
+      if (el.getAttribute('data-done') === '1') el.textContent = map[id];
+    });
+  }
+  fillStats();
+  /* mark counters done so sync updates don't replay the animation */
+  setTimeout(function () {
+    ['statStudents', 'statTeachers', 'statHomework', 'statChat'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.setAttribute('data-done', '1');
+    });
+  }, 2200);
+  window.__aiaRefresh = fillStats;
+
+  App.initTiltCards();
+  App.observeReveals(document);
+
   /* --- GSAP hero entrance + parallax --- */
   App.heroEntrance();
   App.initParallax();

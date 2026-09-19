@@ -149,5 +149,15 @@
     '<div><h3 class="heading-sm" style="margin-bottom:8px">Section 10-B</h3>' +
     '<p class="text-secondary" style="font-size:0.9rem">' + App.escapeHtml(info) + '</p></div></div>';
 
+  var stT = 0;
+  window.__aiaRefresh = function () {
+    clearTimeout(stT);
+    stT = setTimeout(function () {
+      profiles = DataStore.getStudentProfiles();
+      students = DataStore.getStudents().slice().sort(function (a, b) { return a.localeCompare(b, 'en', { sensitivity: 'base' }); });
+      render(searchInput.value);
+    }, 300);
+  };
+
   render('');
 })();

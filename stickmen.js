@@ -1,553 +1,781 @@
 /* ============================================================
-   STICK MEN — VINAY & NITIN (v4 physics engine)
+   STICKMEN v5 — "Classic Alive" engine
    ------------------------------------------------------------
-   Complete rewrite. Small chibi mascots (44x64) that live on
-   the bottom edge of the viewport and act CALM:
-   • requestAnimationFrame physics — NO CSS transitions for
-     position/limbs (only the speech bubble fades)
-   • easeInOutCubic walking + overshoot jump easing
-   • walking: 2-3px bob, opposite arm/leg swing, body lean
-   • idle: chest breathing (1.0 -> 1.015), blink every 8-15s,
-     slow weight shift every 5-8s
-   • 8-20s idle between actions; walks 2-4s / 100-300px
-   • bubbles ONLY on click, max once per 30s
-   • high-five max once per 60s
-   • respects prefers-reduced-motion (fully static pose)
-   • 32px semi-transparent toggle button (bottom-right)
+   Vinay & Nitin as CLASSIC stick figures (circle head + line
+   limbs) with a professional procedural-animation rig:
+
+   • 2-bone IK arms & legs (elbows/knees bend naturally)
+   • spring-lag head, cursor-tracking pupils, blinking,
+     breathing chest, weight sway — they feel ALIVE
+   • squash & stretch jumps, anticipation crouch, landing dust
+   • walk / run gait, wave, dance, high-five, yawn, celebrate
+   • GRAB & THROW them (mouse + touch) with gravity physics
+   • typewriter speech bubbles fed by real site data
+   • single rAF loop, pause when hidden, reduced-motion safe
    ============================================================ */
 (function () {
   'use strict';
-  if (window.StickMen) return;
+  if (window.StickMen && window.StickMen.__v === 5) return;
 
-  /* ---------- motion preference ---------- */
+  /* ---------------- utils ---------------- */
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
+  function dampRate(perSec, dt) { return 1 - Math.exp(-perSec * dt); }
+  function easeInOut(t) { t = clamp(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+
+  /* 2-bone IK: root A -> joint J -> target B. bend=+1/-1 picks side. */
+  function solveIK(ax, ay, bx, by, l1, l2, bend) {
+    var dx = bx - ax, dy = by - ay;
+    var d = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+    var maxD = l1 + l2 - 0.5, minD = Math.abs(l1 - l2) + 0.5;
+    if (d > maxD) { bx = ax + dx / d * maxD; by = ay + dy / d * maxD; d = maxD; }
+    if (d < minD) { bx = ax + dx / d * minD; by = ay + dy / d * minD; d = minD; }
+    var cosA = clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
+    var ang = Math.atan2(dy, dx) + bend * Math.acos(cosA);
+    return { jx: ax + Math.cos(ang) * l1, jy: ay + Math.sin(ang) * l1, bx: bx, by: by };
+  }
+
   var REDUCED = false;
   try { REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  var IS_TOUCH = false;
+  try { IS_TOUCH = window.matchMedia('(hover: none), (pointer: coarse)').matches; } catch (e) {}
 
-  /* ---------- speech lines (real site updates) ---------- */
-  function siteLines(key) {
+  /* ---------------- speech (real site data) ---------------- */
+  function siteLines() {
     var out = [];
     try {
-      var name = '';
       var sess = (window.DataStore && DataStore.getSession) ? DataStore.getSession() : null;
-      if (sess && sess.name) name = String(sess.name);
+      var name = sess && sess.name ? String(sess.name) : '';
       var hw = (window.DataStore && DataStore.getHomework) ? (DataStore.getHomework() || []) : [];
       var ann = (window.DataStore && DataStore.getAnnouncements) ? (DataStore.getAnnouncements() || []) : [];
       var polls = (window.DataStore && DataStore.getPolls) ? (DataStore.getPolls() || []) : [];
-      var msg = (window.DataStore && DataStore.getClassChat) ? (DataStore.getClassChat() || []) : [];
-      if (name) {
-        out.push('👋 Hey ' + name + '!');
-        out.push('😊 Good to see you, ' + name + '.');
-      } else {
-        out.push('👋 Hi there! Login to see your class.');
-      }
-      if (ann.length) out.push('📢 ' + String(ann[0].title).slice(0, 42));
-      if (hw.length) out.push('📚 ' + String(hw[0].subject || 'Homework') + ' by ' + String(hw[0].due || 'soon'));
-      if (polls.length) out.push('🗳️ Poll open: ' + String(polls[0].question).slice(0, 36));
-      if (msg.length) out.push('💬 ' + msg.length + ' messages in class chat');
-      if (out.length < 3) out.push('🌱 Check homework, news or polls!');
-    } catch (e) {
-      out = ['👋 Hey!', '🌱 Explore the hub!'];
-    }
+      var chat = (window.DataStore && DataStore.getClassChat) ? (DataStore.getClassChat() || []) : [];
+      var scores = (window.DataStore && DataStore.getTestScores) ? (DataStore.getTestScores() || []) : [];
+      if (name && name !== 'Visitor') { out.push('Hey ' + name.split(' ')[0] + '!'); out.push(name.split(' ')[0] + ' is here!'); }
+      else out.push('Hi! Tap us — we are alive!');
+      if (ann.length) out.push(String(ann[0].title).slice(0, 40));
+      if (hw.length) out.push((hw[0].subject || 'Homework') + ' due ' + (hw[0].due || hw[0].due_date || 'soon'));
+      if (polls.length) out.push('Vote: ' + String(polls[0].question).slice(0, 34));
+      if (chat.length) out.push(chat.length + ' chats in the hub!');
+      if (scores.length) out.push(scores[0].student_name + ': ' + scores[0].score + '/' + scores[0].max_score + '!');
+    } catch (e) { out = ['Hey there!', 'Welcome to 10-A!']; }
+    out.push('Drag me & throw me!');
+    out.push('Double-tap = dance!');
     return out;
   }
+  var QUIPS = ['Yo!', 'Sup?', 'Hehe!', 'Wheee!', 'Nice!', '10-A rocks!', 'Ouch… jk!', 'Again! Again!'];
 
-  /* ---------- easing ---------- */
-  function easeInOutCubic(t) {
-    t = Math.max(0, Math.min(1, t));
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  }
-  /* overshoot for jump arcs (easeOutBack style) */
-  function overshoot(t) {
-    t = Math.max(0, Math.min(1, t));
-    var c1 = 1.70158;
-    var c3 = c1 + 1;
-    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-  }
+  /* ---------------- geometry / world ---------------- */
+  var GY = 158, CX = 60;                 // ground Y / center X in SVG units
+  var HIP = { x: 60, y: 112 }, CHEST = { x: 60, y: 78 }, HEAD = { x: 60, y: 50 }, HEAD_R = 13.5;
+  var SH = { x: 60, y: 84 };               // shoulder point
+  var HAND_L = { x: 43, y: 110 }, HAND_R = { x: 77, y: 110 };
+  var FOOT_L = { x: 51, y: GY }, FOOT_R = { x: 69, y: GY };
+  var L_UPPER = 24, L_LOWER = 24, A_UPPER = 16, A_LOWER = 17;
 
-  /* ---------- geometry ---------- */
-  var W = 44, H = 64;                 // figure size
-  var VIEW_W = 0, VIEW_H = 0;
-  var FLOOR_Y = 0;                    // feet rest line
-  var MIN_X = 34, MAX_X = 0;
-
-  var HIGHFIVE_COOLDOWN = 60000;
-  var BUBBLE_COOLDOWN = 30000;
-  var lastHighFiveAt = -60000;
-
-  /* ---------- state ---------- */
-  var stage = null;
+  var stage = null, toggleBtn = null, rafId = 0, lastT = 0, hidden = false;
   var figures = {};
-  var rafId = 0;
-  var last = 0;
   var timers = [];
-  var toggleBtn = null;
-  var hidden = false;
+  var pointer = { x: -9999, y: -9999, active: false };
+  var BUBBLE_CD = 22000, HF_CD = 60000, WAVE_CD = 18000;
+  var lastHighFive = -HF_CD, lastAmbient = 0;
+  var floorPad = 10, figW = 88;            // set by measure()
+  var MIN_X = 40, MAX_X = 300;
 
-  function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-  function randBetween(a, b) { return a + Math.random() * (b - a); }
-  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function later(fn, ms) { var id = setTimeout(fn, ms); timers.push(id); return id; }
 
-  /* ============================================================
-     CHIBI SVG (big head, small body, 2:1 head-to-body)
-     ============================================================ */
+  /* ---------------- DOM ---------------- */
   function stickSVG(key) {
-    var isVinay = key === 'vinay';
-    var skin = '#ffd9a8';
-    var bodyHi = isVinay ? '#7c6cff' : '#2dd4bf';
-    var bodyLo = isVinay ? '#5546d6' : '#159ec9';
-    var ink = isVinay ? '#3d2fa8' : '#0e6f92';
-    var gradId = 'smg' + (isVinay ? 'Vinay' : 'Nitin');
-    var streamline = isVinay ? '#5a4bd6' : '#12a8c2';
-
-    /* little chest emblems */
-    var emblem = isVinay
-      ? '<path d="M22 27.2 l.9 2.05 2.05 .9 -2.05 .9 -.9 2.05 -.9 -2.05 -2.05 -.9 2.05 -.9 z" fill="#ffd889"/>'
-      : '<g><rect x="19" y="26.4" width="6" height="7" rx="1.6" fill="#ffffff" opacity=".9"/>' +
-        '<rect x="20.2" y="27.8" width="3.6" height="1.5" rx=".75" fill="' + streamline + '"/>' +
-        '<circle cx="22" cy="31.4" r="1.1" fill="' + streamline + '"/></g>';
-
-    /* tiny sparkle above Vinay's head */
-    var sparkle = isVinay
-      ? '<g class="sm-sparkle"><path d="M22 1.6 l1 2.3 2.3 1 -2.3 1 -1 2.3 -1 -2.3 -2.3 -1 2.3 -1 z" fill="#ffd889"/></g>'
-      : '';
-
-    return (
-      '<svg class="sm-svg" viewBox="0 0 44 64" width="44" height="64" xmlns="http://www.w3.org/2000/svg">' +
-      '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0" stop-color="' + bodyHi + '"/><stop offset="1" stop-color="' + bodyLo + '"/>' +
-      '</linearGradient></defs>' +
-      /* ground shadow (stays planted while body bobs/jumps) */
-      '<ellipse class="sm-shadow" cx="22" cy="60.5" rx="11" ry="2.4" fill="#000" opacity=".26"/>' +
-      '<g class="sm-flip">' +           /* horizontal flip (facing) */
-      '<g class="sm-bodyroot">' +       /* bob + lean applied here   */
-      sparkle +
-      /* legs */
-      '<g class="sm-legL"><path d="M22 42 L17 58" stroke="' + ink + '" stroke-width="5" stroke-linecap="round"/>' +
-      '<circle cx="17" cy="58.5" r="2.6" fill="' + ink + '"/></g>' +
-      '<g class="sm-legR"><path d="M22 42 L27 58" stroke="' + ink + '" stroke-width="5" stroke-linecap="round"/>' +
-      '<circle cx="27" cy="58.5" r="2.6" fill="' + ink + '"/></g>' +
-      /* torso + emblem (breathing scale applied to torso) */
-      '<g class="sm-torso"><rect x="14" y="22" width="16" height="20" rx="6" fill="url(#' + gradId + ')"/>' + emblem + '</g>' +
-      /* arms */
-      '<g class="sm-armL"><line x1="17" y1="25" x2="11" y2="36" stroke="' + ink + '" stroke-width="4.2" stroke-linecap="round"/>' +
-      '<circle cx="11" cy="36.5" r="2.3" fill="' + skin + '"/></g>' +
-      '<g class="sm-armR"><line x1="27" y1="25" x2="33" y2="36" stroke="' + ink + '" stroke-width="4.2" stroke-linecap="round"/>' +
-      '<circle cx="33" cy="36.5" r="2.3" fill="' + skin + '"/></g>' +
-      /* big head: dot eyes + curved smile */
-      '<g class="sm-head">' +
-      '<circle cx="22" cy="13" r="9" fill="' + skin + '"/>' +
-      /* hair: Vinay = spiky dark fringe, Nitin = neat side part */
-      (isVinay
-        ? '<g class="sm-hair"><path d="M13.5 10.5 Q13 5 16 3.6 Q17.5 7 22 5.5 Q26 7 28 3.8 Q31 5.4 30.5 10.5 Q26 7.4 22 9 Q18 7.4 13.5 10.5 Z" fill="#2b1f6e"/>' +
-          '<path d="M13.5 10.5 Q17 8 22 9 Q27 8 30.5 10.5" stroke="#2b1f6e" stroke-width="2.2" fill="none" stroke-linecap="round"/></g>'
-        : '<g class="sm-hair"><path d="M13.5 11 Q13 4.6 17 3.4 Q22 2.6 27 3.6 Q31 4.8 30.5 11 Q27 7.6 22 8 Q17 7.6 13.5 11 Z" fill="#123c52"/>' +
-          '<path d="M22 3.4 Q20.5 7 22 8" stroke="#123c52" stroke-width="1.8" fill="none" stroke-linecap="round"/></g>') +
-      '<g class="sm-eyes"><circle cx="18.9" cy="12.6" r="1.45" fill="#1b1240"/>' +
-      '<circle cx="25.1" cy="12.6" r="1.45" fill="#1b1240"/></g>' +
-      /* glasses: round frames + bridge (Vinay: purple, Nitin: teal) */
-      '<g class="sm-glasses" fill="none" stroke="' + (isVinay ? '#5a4bd6' : '#0e86a8') + '" stroke-width="1.3">' +
-      '<circle cx="18.9" cy="12.6" r="2.9"/>' +
-      '<circle cx="25.1" cy="12.6" r="2.9"/>' +
-      '<line x1="21.8" y1="12.6" x2="22.2" y2="12.6"/>' +
-      '<line x1="16" y1="11.4" x2="14.9" y2="10.9"/>' +
-      '<line x1="28" y1="11.4" x2="29.1" y2="10.9"/>' +
-      '</g>' +
-      '<path d="M18.6 16 Q22 18.8 25.4 16" stroke="' + (isVinay ? '#6b3a1f' : '#0e5a4a') + '" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
-      '</g>' +
-      '</g></g></svg>'
-    );
+    var isV = key === 'vinay';
+    var ink = isV ? '#9d8cff' : '#5eead4';
+    var inkDim = isV ? '#6a5ae0' : '#14b8a6';
+    var acc = isV ? '#c4b5fd' : '#ffd889';
+    var w = isV ? 4.4 : 4.2;
+    var s = '';
+    s += '<svg class="sm-svg" viewBox="0 0 120 172" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+    s += '<defs><filter id="smGlow' + key + '" x="-60%" y="-60%" width="220%" height="220%">' +
+         '<feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
+    s += '<ellipse class="p-shadow" cx="60" cy="162" rx="17" ry="3.2" fill="#000" opacity=".32"/>';
+    s += '<g class="p-squash"><g class="p-all" filter="url(#smGlow' + key + ')">';
+    /* legs */
+    s += '<g stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round" fill="none">';
+    s += '<line class="p-thighL" x1="60" y1="112" x2="55" y2="135"/><line class="p-shinL" x1="55" y1="135" x2="51" y2="158"/>';
+    s += '<line class="p-thighR" x1="60" y1="112" x2="65" y2="135"/><line class="p-shinR" x1="65" y1="135" x2="69" y2="158"/>';
+    s += '</g>';
+    s += '<circle class="p-footL" cx="51" cy="158" r="3.4" fill="' + ink + '"/><circle class="p-footR" cx="69" cy="158" r="3.4" fill="' + ink + '"/>';
+    /* torso */
+    s += '<line class="p-spine" x1="60" y1="112" x2="60" y2="78" stroke="' + ink + '" stroke-width="' + (w + 1.2) + '" stroke-linecap="round"/>';
+    s += '<circle class="p-hip" cx="60" cy="112" r="3" fill="' + inkDim + '"/>';
+    if (!isV) { /* Nitin tie */
+      s += '<g class="p-tie" stroke="' + acc + '" fill="none" stroke-width="2.6" stroke-linecap="round">';
+      s += '<line class="p-tieLine" x1="60" y1="86" x2="60" y2="98"/><path class="p-tieKnot" d="M60 98 l4.5 6 -4.5 6 -4.5 -6 z" fill="' + acc + '" stroke="none"/></g>';
+    }
+    /* arms */
+    s += '<g stroke="' + ink + '" stroke-width="' + (w - 0.6) + '" stroke-linecap="round" fill="none">';
+    s += '<line class="p-upArmL" x1="60" y1="84" x2="51" y2="97"/><line class="p-foArmL" x1="51" y1="97" x2="43" y2="110"/>';
+    s += '<line class="p-upArmR" x1="60" y1="84" x2="69" y2="97"/><line class="p-foArmR" x1="69" y1="97" x2="77" y2="110"/>';
+    s += '</g>';
+    s += '<circle class="p-handL" cx="43" cy="110" r="3.2" fill="' + ink + '"/><circle class="p-handR" cx="77" cy="110" r="3.2" fill="' + ink + '"/>';
+    /* head */
+    s += '<g class="p-headG">';
+    s += '<circle class="p-head" cx="60" cy="50" r="' + HEAD_R + '" fill="rgba(10,14,28,.55)" stroke="' + ink + '" stroke-width="' + w + '"/>';
+    if (isV) { /* Vinay headband */
+      s += '<g class="p-band"><path class="p-bandArc" d="M47 45 Q60 36 73 45" stroke="' + acc + '" stroke-width="4" fill="none" stroke-linecap="round"/>';
+      s += '<line class="p-bandT1" x1="70" y1="42" x2="78" y2="36" stroke="' + acc + '" stroke-width="2.4" stroke-linecap="round"/>';
+      s += '<line class="p-bandT2" x1="69" y1="45" x2="77" y2="44" stroke="' + acc + '" stroke-width="2.2" stroke-linecap="round"/></g>';
+    } else { /* Nitin glasses */
+      s += '<g class="p-glasses" stroke="' + acc + '" stroke-width="1.8" fill="none">';
+      s += '<circle class="p-glL" cx="55" cy="49" r="4.6"/><circle class="p-glR" cx="65" cy="49" r="4.6"/>';
+      s += '<line class="p-glBridge" x1="59.6" y1="49" x2="60.4" y2="49"/></g>';
+    }
+    s += '<ellipse class="p-eyeL" cx="55" cy="49.5" rx="2" ry="2.4" fill="#fff"/>';
+    s += '<ellipse class="p-eyeR" cx="65" cy="49.5" rx="2" ry="2.4" fill="#fff"/>';
+    s += '<circle class="p-pupL" cx="55" cy="49.5" r="1.15" fill="#0b1020"/>';
+    s += '<circle class="p-pupR" cx="65" cy="49.5" r="1.15" fill="#0b1020"/>';
+    s += '<path class="p-mouth" d="M55 57 Q60 60.5 65 57" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity=".92"/>';
+    s += '<ellipse class="p-mouthOpen" cx="60" cy="58.5" rx="2.6" ry="3.2" fill="#3b1020" opacity="0"/>';
+    s += '</g>'; /* headG */
+    s += '</g></g></svg>';
+    return s;
   }
 
-  /* ============================================================
-     FIGURE — build DOM + state object
-     ============================================================ */
+  function $(fig, cls) { return fig.svg.querySelector('.' + cls); }
+
   function buildFigure(key, name, x) {
-    var fig = document.createElement('div');
-    fig.className = 'stickman sm-' + key;
-    fig.setAttribute('role', 'img');
-    fig.setAttribute('aria-label', name + ' mascot');
-    fig.innerHTML = '<div class="sm-tag">' + name + '</div>' +
-      '<div class="sm-bubble" aria-hidden="true"></div>' +
+    var el = document.createElement('div');
+    el.className = 'stickman sm-' + key;
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', name + ' — classic stickman mascot. Drag me!');
+    el.innerHTML = '<div class="sm-tag">' + name + '</div>' +
+      '<div class="sm-bubble" aria-hidden="true"><span class="sm-bubble-text"></span></div>' +
       stickSVG(key);
-    stage.appendChild(fig);
-
-    var svg = fig.querySelector('svg');
-    function g(cls) { return svg.querySelector('.' + cls); }
-
-    var f = {
-      key: key, name: name, el: fig, svg: svg,
-      root: g('sm-bodyroot'), torso: g('sm-torso'),
-      armL: g('sm-armL'), armR: g('sm-armR'),
-      legL: g('sm-legL'), legR: g('sm-legR'),
-      eyes: g('sm-eyes'), shadow: g('sm-shadow'), sparkle: g('sm-sparkle'),
-      x: x, y: FLOOR_Y, yOff: 0, facing: 1,
-      mode: 'idle',            /* idle | walk | jump | highfive */
-      t0: 0, dur: 0,
-      fromX: x, toX: x, jumpH: 0, onDone: null,
-      stepPhase: Math.random() * Math.PI * 2,
-      lean: 0, bob: 0,
-      breathPhase: Math.random() * Math.PI * 2,
-      shiftPhase: Math.random() * Math.PI * 2,
-      nextBlink: performance.now() + randBetween(8000, 15000),
-      blinkUntil: 0,
-      lastBubble: -BUBBLE_COOLDOWN
+    el.style.width = figW + 'px';
+    stage.appendChild(el);
+    var svg = el.querySelector('svg');
+    var F = {
+      key: key, name: name, el: el, svg: svg,
+      x: x, y: 0, yOff: 0, vx: 0, vy: 0, dir: 1,
+      mode: 'idle', t0: 0, dur: 0, onDone: null,
+      fromX: x, toX: x, speed: 70, jumpH: 0,
+      phase: Math.random() * 6.28, breath: Math.random() * 6.28,
+      /* smoothed joints */
+      hip: { x: HIP.x, y: HIP.y }, chest: { x: CHEST.x, y: CHEST.y },
+      head: { x: HEAD.x, y: HEAD.y, vx: 0, vy: 0 }, headTilt: 0, headTiltT: 0,
+      handL: { x: HAND_L.x, y: HAND_L.y }, handR: { x: HAND_R.x, y: HAND_R.y },
+      footL: { x: FOOT_L.x, y: FOOT_L.y }, footR: { x: FOOT_R.x, y: FOOT_R.y },
+      gaze: { x: 0, y: 0 }, gazeT: { x: 0, y: 0 },
+      blinkUntil: 0, nextBlink: performance.now() + rand(1800, 4200),
+      nextLook: performance.now() + rand(2500, 6000),
+      smile: 0.7, smileT: 0.7, mouthOpen: 0, mouthOpenT: 0,
+      squashX: 1, squashY: 1, squashTX: 1, squashTY: 1,
+      lean: 0, leanT: 0, crouch: 0, crouchT: 0,
+      /* drag physics */
+      dragging: false, px: 0, py: 0, lastPX: 0, lastPY: 0, air: 0,
+      dangle: { aL: 0, aR: 0, vL: 0, vR: 0, lL: 0, lR: 0, uL: 0, uR: 0 },
+      dizzy: 0, lastBubble: -BUBBLE_CD, lastWave: -WAVE_CD, noticedWave: 0,
+      stepSide: 1, wasAir: false
     };
-    fig.addEventListener('click', function () { react(key); });
-    return f;
+    F.elP = {
+      shadow: svg.querySelector('.p-shadow'), squash: svg.querySelector('.p-squash'),
+      thighL: svg.querySelector('.p-thighL'), shinL: svg.querySelector('.p-shinL'),
+      thighR: svg.querySelector('.p-thighR'), shinR: svg.querySelector('.p-shinR'),
+      footL: svg.querySelector('.p-footL'), footR: svg.querySelector('.p-footR'),
+      spine: svg.querySelector('.p-spine'), hip: svg.querySelector('.p-hip'),
+      upArmL: svg.querySelector('.p-upArmL'), foArmL: svg.querySelector('.p-foArmL'),
+      upArmR: svg.querySelector('.p-upArmR'), foArmR: svg.querySelector('.p-foArmR'),
+      handL: svg.querySelector('.p-handL'), handR: svg.querySelector('.p-handR'),
+      headG: svg.querySelector('.p-headG'), head: svg.querySelector('.p-head'),
+      eyeL: svg.querySelector('.p-eyeL'), eyeR: svg.querySelector('.p-eyeR'),
+      pupL: svg.querySelector('.p-pupL'), pupR: svg.querySelector('.p-pupR'),
+      mouth: svg.querySelector('.p-mouth'), mouthOpen: svg.querySelector('.p-mouthOpen'),
+      bandT1: svg.querySelector('.p-bandT1'), bandT2: svg.querySelector('.p-bandT2'),
+      tieLine: svg.querySelector('.p-tieLine'), tieKnot: svg.querySelector('.p-tieKnot'),
+      glL: svg.querySelector('.p-glL'), glR: svg.querySelector('.p-glR'), glBridge: svg.querySelector('.p-glBridge')
+    };
+    bindPointer(F);
+    return F;
   }
 
-  /* ============================================================
-     SPEECH BUBBLE (click-only, cooldown enforced by caller)
-     ============================================================ */
-  function bubble(fig, text, ms) {
-    var b = fig ? fig.querySelector('.sm-bubble') : null;
-    if (!b) return;
-    b.textContent = text;
-    b.classList.add('show');
-    clearTimeout(b._t);
-    b._t = setTimeout(function () { b.classList.remove('show'); }, ms || 2200);
+  /* ---------------- particles (pooled) ---------------- */
+  var pool = [];
+  function puff(x, y, txt, cls) {
+    if (REDUCED && !txt) return;
+    var el = pool.pop() || document.createElement('span');
+    el.className = 'sm-fx ' + (cls || '');
+    el.textContent = txt || '';
+    if (!txt) { el.style.left = x + 'px'; el.style.top = y + 'px'; }
+    else { el.style.left = x + 'px'; el.style.top = y + 'px'; }
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); if (pool.length < 40) pool.push(el); }, txt ? 1400 : 700);
   }
-
-  /* ============================================================
-     SPARKLE PARTICLES (click)
-     ============================================================ */
-  function sparkle(fig, n) {
-    if (REDUCED) return;
-    n = n || 6;
-    var r = fig.getBoundingClientRect();
-    var cx = r.left + r.width / 2;
-    var cy = r.top + r.height * 0.45;
+  function figCenter(F) {
+    var r = F.el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height * 0.55, w: r.width, h: r.height, top: r.top, bottom: r.bottom };
+  }
+  function burst(F, n, kind) {
+    var c = figCenter(F);
     for (var i = 0; i < n; i++) {
-      var s = document.createElement('span');
-      s.className = 'sm-spark';
-      var ang = Math.random() * Math.PI * 2;
-      var dist = Math.random() * 14;
-      s.style.left = (cx + Math.cos(ang) * dist) + 'px';
-      s.style.top = (cy + Math.sin(ang) * dist) + 'px';
-      s.style.animationDelay = (Math.random() * 0.25) + 's';
-      document.body.appendChild(s);
-      (function (el) { setTimeout(function () { el.remove(); }, 1100); })(s);
+      var a = Math.random() * 6.283, d = rand(6, 42);
+      if (kind === 'confetti') puff(c.x + Math.cos(a) * d, c.y + Math.sin(a) * d * 0.7 - 20, '', 'sm-confetti c' + ((Math.random() * 6) | 0));
+      else if (kind === 'spark') puff(c.x + Math.cos(a) * d, c.y + Math.sin(a) * d, '', 'sm-spark');
+      else if (kind === 'dust') puff(c.x + rand(-16, 16), c.bottom - rand(0, 8), '', 'sm-dust');
+      else if (kind === 'stars') puff(c.x + rand(-18, 18), c.top + rand(-6, 10), pick(['★', '✦', '✶']), 'sm-emoji');
+      else if (kind === 'notes') puff(c.x + rand(-20, 20), c.top - rand(0, 14), pick(['♪', '♫', '♩']), 'sm-emoji');
+      else if (kind === 'hearts') puff(c.x + rand(-16, 16), c.top - rand(0, 10), pick(['❤', '💜', '✨']), 'sm-emoji');
     }
   }
+  function zzz(F) { var c = figCenter(F); puff(c.x + 16, c.top - 4, 'z', 'sm-zzz'); }
 
-  /* ============================================================
-     ACTIONS
-     ============================================================ */
-  function startWalk(key) {
-    var f = figures[key];
-    if (!f || f.mode !== 'idle' || REDUCED) return false;
-    var dist = randBetween(100, 300) * (Math.random() < 0.5 ? -1 : 1);
-    var toX = clamp(f.x + dist, MIN_X, MAX_X);
-    if (Math.abs(toX - f.x) < 40) {           /* near an edge — reverse */
-      toX = clamp(f.x + (toX > f.x ? 140 : -140), MIN_X, MAX_X);
+  /* ---------------- speech bubble ---------------- */
+  function say(F, text, ms) {
+    var b = F.el.querySelector('.sm-bubble'), t = F.el.querySelector('.sm-bubble-text');
+    if (!b || !t) return;
+    F.lastBubble = performance.now();
+    b.classList.add('show');
+    t.textContent = '';
+    clearTimeout(b._t1); clearTimeout(b._t2);
+    var i = 0;
+    b._t1 = setInterval(function () {
+      i++;
+      t.textContent = text.slice(0, i);
+      if (i >= text.length) clearInterval(b._t1);
+    }, 22);
+    b._t2 = setTimeout(function () { b.classList.remove('show'); }, ms || 2600);
+  }
+  function canBubble(F) { return performance.now() - F.lastBubble > BUBBLE_CD; }
+
+  /* ---------------- actions ---------------- */
+  function startWalk(key, tx) {
+    var F = figures[key];
+    if (!F || F.mode !== 'idle' || F.dragging || REDUCED) return false;
+    if (typeof tx === 'number') F.toX = clamp(tx, MIN_X, MAX_X);
+    else {
+      var d = rand(110, 320) * (Math.random() < 0.5 ? -1 : 1);
+      F.toX = clamp(F.x + d, MIN_X, MAX_X);
+      if (Math.abs(F.toX - F.x) < 50) F.toX = clamp(F.x - d, MIN_X, MAX_X);
+      if (Math.abs(F.toX - F.x) < 50) return false;
     }
-    if (Math.abs(toX - f.x) < 40) return false;
-    f.facing = toX > f.x ? 1 : -1;
-    f.mode = 'walk';
-    f.t0 = performance.now();
-    f.fromX = f.x;
-    f.toX = toX;
-    f.dur = clamp(Math.abs(toX - f.x) / 75 * 1000, 2000, 4000);  /* 2-4s */
-    f.onDone = null;
+    F.fromX = F.x; F.dir = F.toX > F.x ? 1 : -1;
+    F.speed = rand(65, 95);
+    F.dur = Math.abs(F.toX - F.x) / F.speed * 1000;
+    F.t0 = performance.now(); F.mode = 'walk'; F.onDone = null;
+    F.smileT = 0.6;
     return true;
   }
-
-  /* walk a figure to a specific x, then call done */
-  function walkTo(key, x, done) {
-    var f = figures[key];
-    if (!f) { if (done) done(); return; }
-    f.facing = x > f.x ? 1 : -1;
-    f.mode = 'walk';
-    f.t0 = performance.now();
-    f.fromX = f.x;
-    f.toX = clamp(x, MIN_X, MAX_X);
-    f.dur = clamp(Math.abs(f.toX - f.fromX) / 75 * 1000, 2000, 4000);
-    f.onDone = done || null;
+  function walkTo(key, x, cb) {
+    var F = figures[key]; if (!F) { if (cb) cb(); return; }
+    if (REDUCED) { F.x = clamp(x, MIN_X, MAX_X); if (cb) cb(); return; }
+    F.fromX = F.x; F.toX = clamp(x, MIN_X, MAX_X);
+    F.dir = F.toX >= F.x ? 1 : -1; F.speed = 85;
+    F.dur = Math.max(500, Math.abs(F.toX - F.x) / F.speed * 1000);
+    F.t0 = performance.now(); F.mode = 'walk'; F.onDone = cb || null;
   }
-
+  function doJump(F, h, cb) {
+    if (!F || F.mode === 'jump' || F.dragging || REDUCED) { if (cb) cb(); return; }
+    F.mode = 'jump'; F.t0 = performance.now(); F.dur = 640; F.jumpH = h || 46; F.onDone = cb || null;
+    F.crouchT = 1; F.squashTX = 1.12; F.squashTY = 0.86;
+    later(function () { if (F.mode === 'jump') { F.crouchT = 0; F.squashTX = 0.94; F.squashTY = 1.1; } }, 130);
+  }
+  function doWave(F, ms) {
+    if (!F || F.dragging || REDUCED) return;
+    if (F.mode !== 'idle') return;
+    F.mode = 'wave'; F.t0 = performance.now(); F.dur = ms || 1800; F.onDone = null;
+    F.smileT = 1; F.lastWave = performance.now();
+  }
+  function doDance(F, ms) {
+    if (!F || F.dragging || REDUCED) return;
+    if (F.mode !== 'idle') return;
+    F.mode = 'dance'; F.t0 = performance.now(); F.dur = ms || 2600; F.onDone = null;
+    F.smileT = 1;
+  }
+  function doYawn(F) {
+    if (!F || F.dragging || REDUCED) return;
+    if (F.mode !== 'idle') return;
+    F.mode = 'yawn'; F.t0 = performance.now(); F.dur = 3200; F.onDone = null;
+    F.mouthOpenT = 1;
+  }
+  function celebrate(key) {
+    var F = figures[key || (Math.random() < 0.5 ? 'vinay' : 'nitin')];
+    if (!F || F.dragging) return;
+    F.smileT = 1;
+    burst(F, 14, 'confetti'); burst(F, 6, 'spark');
+    doJump(F, 60, function () { later(function () { doJump(F, 44); }, 120); });
+    if (canBubble(F)) say(F, pick(['Yay!', 'Woohoo!', '10-A rocks!', 'Amazing!']), 1800);
+  }
   function maybeHighFive() {
-    if (REDUCED || hidden) return;
+    if (REDUCED || hidden || document.hidden) return;
     var now = performance.now();
-    if (now - lastHighFiveAt < HIGHFIVE_COOLDOWN) return;
-    var v = figures.vinay, n = figures.nitin;
-    if (!v || !n) return;
-    if (v.mode !== 'idle' || n.mode !== 'idle') return;
-
-    var midX = clamp((v.x + n.x) / 2, MIN_X + 30, MAX_X - 30);
-    lastHighFiveAt = now;
-
-    /* vinay walks in first, then nitin, then both pose */
-    walkTo('vinay', midX - 24, function () {
-      walkTo('nitin', midX + 24, function () {
-        var t = performance.now();
-        v.mode = 'highfive'; v.t0 = t; v.dur = 1500;
-        n.mode = 'highfive'; n.t0 = t; n.dur = 1500;
-        bubble(v, 'High five! ✋', 1400);
-        bubble(n, 'Yay! ✋', 1400);
-        sparkle(v, 5);
-        sparkle(n, 5);
+    if (now - lastHighFive < HF_CD) return;
+    var V = figures.vinay, N = figures.nitin;
+    if (!V || !N || V.mode !== 'idle' || N.mode !== 'idle' || V.dragging || N.dragging) return;
+    lastHighFive = now;
+    var mid = clamp((V.x + N.x) / 2, MIN_X + 60, MAX_X - 60);
+    walkTo('vinay', mid - 34, function () {
+      walkTo('nitin', mid + 34, function () {
+        [V, N].forEach(function (F) { F.mode = 'highfive'; F.t0 = performance.now(); F.dur = 1100; F.onDone = null; F.smileT = 1; });
+        later(function () {
+          burst(V, 8, 'spark'); burst(N, 8, 'spark');
+          var c = figCenter(V);
+          puff(c.x + 30, c.y - 60, '', 'sm-ring');
+          say(V, 'High five!', 1500); say(N, 'Slap!', 1500);
+        }, 420);
       });
     });
   }
 
-  /* click reaction: jump + sparkles + bubble (30s cooldown) */
-  function react(key) {
-    var f = figures[key];
-    if (!f || hidden) return;
-    var now = performance.now();
-    if (!REDUCED && f.mode === 'idle') {
-      f.mode = 'jump';
-      f.t0 = now;
-      f.dur = 700;
-      f.jumpH = 30;      /* overshoot arc, stays in the bottom band */
+  /* click / tap reaction */
+  function react(F) {
+    if (!F || hidden) return;
+    if (F.dragging) return;
+    F.smileT = 1;
+    later(function () { if (F.mode === 'idle') F.smileT = 0.7; }, 2500);
+    if (!REDUCED && F.mode === 'idle') {
+      if (Math.random() < 0.55) { doWave(F, 1600); burst(F, 5, 'spark'); }
+      else doJump(F, 40);
     }
-    if (now - f.lastBubble >= BUBBLE_COOLDOWN) {
-      f.lastBubble = now;
-      var lines = siteLines(key); bubble(f.el, lines[Math.floor(Math.random() * lines.length)], 2600);
-    }
-    sparkle(f.el, 6);
+    if (canBubble(F)) say(F, pick(siteLines()), 2600);
+    else burst(F, 3, 'hearts');
   }
 
-  /* ============================================================
-     PHYSICS LOOP (requestAnimationFrame)
-     ============================================================ */
-  function updateFigure(f, now, t, dt) {
-    var p;
-    if (f.mode === 'walk') {
-      p = clamp((now - f.t0) / f.dur, 0, 1);
-      var eased = easeInOutCubic(p);
-      f.x = f.fromX + (f.toX - f.fromX) * eased;
-      var speed = Math.abs(f.toX - f.fromX) / f.dur;          /* px/ms */
-      var cadence = 2.6 * clamp(speed / 0.11, 0.6, 1.4);      /* steps/s */
-      f.stepPhase += (dt / 1000) * cadence * Math.PI * 2;
-      f.bob = -Math.abs(Math.sin(f.stepPhase)) * 2.6;         /* 2-3px bob */
-      f.lean = f.facing * 3.4 * Math.sin(Math.min(1, p) * Math.PI); /* lean in/out */
+  /* ---------------- pointer: click + drag & throw ---------------- */
+  function bindPointer(F) {
+    var moved = 0, downAt = 0, downX = 0, downY = 0, lastTap = 0;
+    F.el.addEventListener('pointerdown', function (e) {
+      if (hidden || REDUCED) return;
+      moved = 0; downAt = performance.now(); downX = e.clientX; downY = e.clientY;
+      F.lastPX = e.clientX; F.lastPY = e.clientY; F.vx = 0; F.vy = 0;
+      try { F.el.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    F.el.addEventListener('pointermove', function (e) {
+      if (downAt === 0) return;
+      var dx = e.clientX - downX, dy = e.clientY - downY;
+      moved = Math.max(moved, Math.abs(dx) + Math.abs(dy));
+      if (!F.dragging && moved > 9) {
+        F.dragging = true; F.mode = 'drag'; F.onDone = null;
+        F.mouthOpenT = 1; F.smileT = 0.2;
+        F.el.classList.add('grabbed');
+      }
+      if (F.dragging) {
+        F.vx = e.clientX - F.lastPX; F.vy = e.clientY - F.lastPY;
+        F.lastPX = e.clientX; F.lastPY = e.clientY;
+        F.x = clamp(F.x + F.vx, 8, window.innerWidth - 8);
+        F.yOff = Math.min(0, F.yOff + F.vy);
+        /* dangle physics driven by acceleration */
+        F.dangle.vL += (-F.dangle.aL * 90 - F.vx * 6) * 0.016;
+        F.dangle.vR += (-F.dangle.aR * 90 - F.vx * 6) * 0.016;
+      }
+    });
+    function up(e) {
+      if (downAt === 0) return;
+      downAt = 0;
+      F.el.classList.remove('grabbed');
+      if (F.dragging) {
+        F.dragging = false;
+        F.mouthOpenT = 0;
+        /* throw! velocity in px/frame -> px/s */
+        F.vx = clamp(F.vx * 60, -1400, 1400);
+        F.vy = clamp(F.vy * 60, -1600, 400);
+        if (Math.abs(F.vx) < 60 && Math.abs(F.vy) < 60) { F.mode = 'idle'; F.yOff = 0; }
+        else { F.mode = 'thrown'; F.dizzy = 1; burst(F, 5, 'stars'); }
+        F.t0 = performance.now();
+      } else if (moved <= 9) {
+        var now = performance.now();
+        if (now - lastTap < 320) { lastTap = 0; doDance(F, 2400); burst(F, 6, 'notes'); if (canBubble(F)) say(F, pick(['Dance break!', 'Groove!', '♪ ♪']), 1600); }
+        else { lastTap = now; later(function () { if (lastTap && performance.now() - lastTap >= 300) { lastTap = 0; react(F); } }, 330); }
+      }
+      moved = 0;
+    }
+    F.el.addEventListener('pointerup', up);
+    F.el.addEventListener('pointercancel', up);
+  }
+
+  /* ---------------- scheduler ---------------- */
+  function schedule() {
+    timers.push(setTimeout(function () {
+      if (stage) {
+        if (!hidden && !document.hidden && !REDUCED) {
+          var r = Math.random();
+          var V = figures.vinay, N = figures.nitin;
+          var idleV = V && V.mode === 'idle' && !V.dragging;
+          var idleN = N && N.mode === 'idle' && !N.dragging;
+          if (r < 0.50) { /* walk one of them */
+            var k = Math.random() < 0.5 ? 'vinay' : 'nitin';
+            if (!startWalk(k)) startWalk(k === 'vinay' ? 'nitin' : 'vinay');
+          } else if (r < 0.62 && (idleV || idleN)) {
+            var F1 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
+            doWave(F1, 1700);
+            if (Math.random() < 0.4 && canBubble(F1)) say(F1, pick(QUIPS), 1500);
+          } else if (r < 0.72 && (idleV || idleN)) {
+            var F2 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
+            doDance(F2, 2400); burst(F2, 5, 'notes');
+          } else if (r < 0.80 && (idleV || idleN)) {
+            var F3 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
+            doJump(F3, rand(36, 58));
+          } else if (r < 0.90) { maybeHighFive(); }
+          else if (idleV || idleN) {
+            var F4 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
+            doYawn(F4);
+          }
+          /* rare ambient chatter */
+          var now = performance.now();
+          if (now - lastAmbient > 75000 && Math.random() < 0.35) {
+            lastAmbient = now;
+            var FA = Math.random() < 0.5 ? V : N;
+            if (FA && FA.mode === 'idle' && canBubble(FA)) say(FA, pick(siteLines()), 2400);
+          }
+        }
+        schedule();
+      }
+    }, rand(7000, 15000)));
+  }
+
+  /* ---------------- per-frame update ---------------- */
+  function updateFigure(F, now, dt, t) {
+    var p, k;
+    /* --- mode state --- */
+    if (F.mode === 'walk') {
+      p = clamp((now - F.t0) / F.dur, 0, 1);
+      var e = easeInOut(p);
+      F.x = F.fromX + (F.toX - F.fromX) * e;
+      F.dir = F.toX >= F.fromX ? 1 : -1;
+      F.phase += dt * (F.speed / 26) * Math.PI;   /* stride-linked cadence */
+      F.leanT = F.dir * 0.09;
+      /* footstep dust on plant */
+      var s = Math.sin(F.phase);
+      var side = s > 0 ? 1 : -1;
+      if (side !== F.stepSide) { F.stepSide = side; burst(F, 2, 'dust'); }
+      if (p >= 1) { var cb = F.onDone; F.mode = 'idle'; F.onDone = null; F.leanT = 0; if (cb) cb(); }
+    } else if (F.mode === 'jump') {
+      p = clamp((now - F.t0) / F.dur, 0, 1);
+      if (p < 0.2) { F.yOff = -6 * Math.sin(p / 0.2 * Math.PI / 2); }        /* crouch dip */
+      else { var jp = (p - 0.2) / 0.8; F.yOff = -F.jumpH * 4 * jp * (1 - jp); } /* parabola */
+      if (p > 0.85) { F.squashTX = 1; F.squashTY = 1; }
       if (p >= 1) {
-        var cb = f.onDone;
-        f.mode = 'idle'; f.onDone = null;
-        f.x = f.toX; f.bob = 0; f.lean = 0;
-        if (cb) cb();
+        F.mode = 'idle'; F.yOff = 0; F.onDone && F.onDone(); F.onDone = null;
+        F.squashTX = 1.14; F.squashTY = 0.84;                                  /* land squash */
+        burst(F, 5, 'dust');
+        later(function () { F.squashTX = 1; F.squashTY = 1; }, 140);
       }
-    } else if (f.mode === 'jump') {
-      p = clamp((now - f.t0) / f.dur, 0, 1);
-      f.yOff = -f.jumpH * overshoot(p);
-      f.bob = 0; f.lean = 0;
-      if (p >= 1) { f.mode = 'idle'; f.yOff = 0; }
-    } else if (f.mode === 'highfive') {
-      p = clamp((now - f.t0) / f.dur, 0, 1);
-      f.bob = 0; f.lean = 0;
-      if (p >= 1) f.mode = 'idle';
-    } else {
-      /* idle — settle toward rest */
-      f.bob *= 0.85;
-      f.lean *= 0.85;
-      f.yOff *= 0.85;
+    } else if (F.mode === 'thrown') {
+      /* gravity world physics */
+      F.vy += 2600 * dt;
+      F.x += F.vx * dt;
+      F.yOff += F.vy * dt;
+      F.vx *= Math.exp(-0.4 * dt);
+      var W = window.innerWidth;
+      if (F.x < 20) { F.x = 20; F.vx = Math.abs(F.vx) * 0.55; }
+      if (F.x > W - 20) { F.x = W - 20; F.vx = -Math.abs(F.vx) * 0.55; }
+      if (F.yOff >= 0) {
+        F.yOff = 0;
+        if (Math.abs(F.vy) > 260) { F.vy = -F.vy * 0.45; F.vx *= 0.7; burst(F, 4, 'dust'); F.squashTX = 1.16; F.squashTY = 0.82; later(function () { F.squashTX = 1; F.squashTY = 1; }, 130); }
+        else { F.vy = 0; F.vx *= Math.exp(-6 * dt); if (Math.abs(F.vx) < 25) { F.mode = 'idle'; F.dizzy = Math.max(F.dizzy, 0.7); burst(F, 5, 'stars'); if (canBubble(F)) say(F, pick(['Whoa!', 'Wheee!', 'Again!', 'I\'m ok!']), 1600); } }
+      }
+      F.phase += dt * 14;
+      F.dizzy = Math.max(F.dizzy, 0.4);
+    } else if (F.mode === 'wave' || F.mode === 'dance' || F.mode === 'yawn' || F.mode === 'highfive') {
+      p = clamp((now - F.t0) / F.dur, 0, 1);
+      if (F.mode === 'dance' && Math.random() < dt * 3) burst(F, 1, 'notes');
+      if (F.mode === 'yawn' && Math.random() < dt * 1.4) zzz(F);
+      if (F.mode === 'highfive') F.yOff = -14 * 4 * p * (1 - p);
+      if (p >= 1) { F.mode = 'idle'; F.yOff = 0; F.mouthOpenT = 0; if (F.smileT > 0.8) F.smileT = 0.7; }
+    } else if (F.mode === 'drag') {
+      /* dangle pendulum */
+      var D = F.dangle;
+      D.vL += (-D.aL * 120 - D.vL * 3.2) * dt; D.aL += D.vL * dt;
+      D.vR += (-D.aR * 120 - D.vR * 3.2) * dt; D.aR += D.vR * dt;
+      D.uL += (-D.lL * 100 - D.uL * 3.2) * dt; D.lL += D.uL * dt;
+      D.uR += (-D.lR * 100 - D.uR * 3.2) * dt; D.lR += D.uR * dt;
+    } else { F.leanT *= 0.9; }
+
+    F.dizzy = Math.max(0, F.dizzy - dt * 0.5);
+
+    /* --- blink --- */
+    if (now >= F.nextBlink) { F.blinkUntil = now + 130; F.nextBlink = now + rand(2200, 5200); }
+    var blinking = now < F.blinkUntil || F.mode === 'yawn';
+
+    /* --- gaze: cursor tracking + wander --- */
+    var c = figCenter(F);
+    if (pointer.active && !IS_TOUCH) {
+      var gx = clamp((pointer.x - c.x) / 160, -1, 1), gy = clamp((pointer.y - c.y) / 160, -1, 1);
+      F.gazeT.x = gx; F.gazeT.y = gy * 0.7;
+      /* noticed you! wave when cursor hovers close */
+      var near = Math.abs(pointer.x - c.x) < 90 && Math.abs(pointer.y - c.y) < 130;
+      if (near && F.mode === 'idle' && now - F.noticedWave > 25000 && now - F.lastWave > WAVE_CD) {
+        F.noticedWave = now; doWave(F, 1500);
+        if (canBubble(F) && Math.random() < 0.5) say(F, pick(['Hi!!', 'Hey you!', 'I see you!', 'Hello!']), 1500);
+      }
+    } else if (now >= F.nextLook) {
+      F.nextLook = now + rand(2500, 6000);
+      F.gazeT.x = rand(-0.7, 0.7); F.gazeT.y = rand(-0.4, 0.4);
     }
 
-    /* blink schedule (idle + walking both blink) */
-    if (now >= f.nextBlink) {
-      f.blinkUntil = now + 130;
-      f.nextBlink = now + randBetween(8000, 15000);
-    }
-    var blinking = now < f.blinkUntil;
+    /* --- smooth values --- */
+    var kd = dampRate(10, dt), ks = dampRate(16, dt), kh = dampRate(7, dt);
+    F.gaze.x = lerp(F.gaze.x, F.gazeT.x, kd); F.gaze.y = lerp(F.gaze.y, F.gazeT.y, kd);
+    F.smile = lerp(F.smile, F.smileT, kd);
+    F.mouthOpen = lerp(F.mouthOpen, F.mouthOpenT, dampRate(8, dt));
+    F.squashX = lerp(F.squashX, F.squashTX, ks); F.squashY = lerp(F.squashY, F.squashTY, ks);
+    F.lean = lerp(F.lean, F.leanT, kd);
+    F.crouch = lerp(F.crouch, F.crouchT, dampRate(14, dt));
+    F.headTilt = lerp(F.headTilt, F.headTiltT, kd);
 
-    /* breathing + weight shift */
-    var breath = 1 + 0.015 * Math.sin(t * 2.0 + f.breathPhase);
-    var shift = Math.sin((t / 6.0) * Math.PI * 2 + f.shiftPhase) * 1.5;
-
-    renderFigure(f, breath, shift, blinking);
+    renderFigure(F, now, dt, t, blinking);
   }
 
-  function renderFigure(f, breath, shift, blinking) {
-    var now = performance.now();
-    var svgStyle = f.svg.style;
-    svgStyle.transform = 'scaleX(' + f.facing + ')';
-    svgStyle.transformOrigin = '22px 32px';
+  function renderFigure(F, now, dt, t, blinking) {
+    var E = F.elP;
+    /* targets for this frame */
+    var hip = { x: HIP.x, y: HIP.y }, chest = { x: CHEST.x, y: CHEST.y };
+    var hL = { x: HAND_L.x, y: HAND_L.y }, hR = { x: HAND_R.x, y: HAND_R.y };
+    var fL = { x: FOOT_L.x, y: FOOT_L.y }, fR = { x: FOOT_R.x, y: FOOT_R.y };
+    var headY = HEAD.y, headX = HEAD.x, tilt = 0;
 
-    /* bodyroot: bob (translate) + lean (rotate around hip) */
-    var rootT = 'translate(0 ' + f.yOff.toFixed(2) + ') translate(' + shift.toFixed(2) + ' 0) rotate(' + f.lean.toFixed(2) + ' 22 42)';
-    f.root.setAttribute('transform', rootT);
+    var br = Math.sin(t * (F.mode === 'dance' ? 9 : 1.7) + F.breath);   /* breath */
+    var sway = Math.sin(t * 0.7 + F.breath * 2) * 1.6;                    /* weight sway */
 
-    /* torso: breathing scale around its center */
-    f.torso.setAttribute('transform',
-      'translate(22 32) scale(' + breath.toFixed(4) + ' ' + breath.toFixed(4) + ') translate(-22 -32)');
-
-    /* limbs — walking swing / jump tuck / high-five reach / idle sway */
-    var swing = 0, idleSway = Math.sin(now / 560 + f.breathPhase) * 2.5;
-    if (f.mode === 'walk') {
-      swing = Math.sin(f.stepPhase) * 24;
-    } else if (f.mode === 'jump') {
-      swing = 18;
-    } else if (f.mode === 'highfive') {
-      swing = 0;
+    if (F.mode === 'walk') {
+      var stride = 13, lift = 9;
+      var pL = F.phase, pR = F.phase + Math.PI;
+      fL.x = FOOT_L.x + Math.sin(pL) * stride; fL.y = GY - Math.max(0, Math.cos(pL)) * lift;
+      fR.x = FOOT_R.x + Math.sin(pR) * stride; fR.y = GY - Math.max(0, Math.cos(pR)) * lift;
+      var bob = Math.abs(Math.sin(F.phase)) * 2.6;
+      hip.y -= bob; chest.y -= bob * 1.25; headY -= bob * 1.4;
+      hip.x += Math.sin(F.phase) * 1.5 + F.lean * 30;
+      chest.x += F.lean * 46; headX += F.lean * 52;
+      hL.x = HAND_L.x - Math.sin(pL) * 10; hL.y = HAND_L.y - Math.max(0, -Math.cos(pL)) * 3;
+      hR.x = HAND_R.x - Math.sin(pR) * 10; hR.y = HAND_R.y - Math.max(0, -Math.cos(pR)) * 3;
+      chest.y -= 0.8;
+    } else if (F.mode === 'jump') {
+      var air = clamp(-F.yOff / 50, 0, 1);
+      fL.y = GY - 16 * air; fL.x = FOOT_L.x - 4 * air;
+      fR.y = GY - 16 * air; fR.x = FOOT_R.x + 4 * air;
+      hL.x = 38; hL.y = 58 - 6 * air; hR.x = 82; hR.y = 58 - 6 * air;
+      headY -= 2 * air;
+    } else if (F.mode === 'thrown') {
+      var fl = Math.sin(t * 22);
+      hL.x = 36 + fl * 5; hL.y = 66 + fl * 4; hR.x = 84 - fl * 5; hR.y = 66 - fl * 4;
+      fL.y = GY - 8 + fl * 3; fR.y = GY - 8 - fl * 3;
+      tilt = clamp(F.vx / 1400, -1, 1) * 0.35;
+      F.mouthOpenT = 1;
+    } else if (F.mode === 'drag') {
+      var D = F.dangle;
+      hL.x = SH.x - 14 + D.aL * 22; hL.y = 108 + Math.abs(D.aL) * -8 + 6;
+      hR.x = SH.x + 14 + D.aR * 22; hR.y = 108 + Math.abs(D.aR) * -8 + 6;
+      fL.x = 54 + D.lL * 20; fL.y = GY - 4; fR.x = 66 + D.lR * 20; fR.y = GY - 4;
+      headY += 3; tilt = clamp((F.lastPX - (figCenter(F).x)) / 200, -0.4, 0.4);
+    } else if (F.mode === 'wave') {
+      var wag = Math.sin(t * 16) * 7;
+      hR.x = 86 + wag * 0.5; hR.y = 50 + Math.abs(wag) * 0.3;
+      hL.x = HAND_L.x - 2; hL.y = HAND_L.y + 2;
+      tilt = 0.14; headY += 1;
+      hip.y += Math.abs(Math.sin(t * 8)) * -1.5;
+    } else if (F.mode === 'dance') {
+      var b = Math.abs(Math.sin(t * 10));
+      hip.y -= b * 7; chest.y -= b * 8; headY -= b * 9;
+      hip.x += Math.sin(t * 5) * 5; chest.x += Math.sin(t * 5 + 0.6) * 6;
+      var up = Math.sin(t * 10) > 0;
+      hL.x = up ? 34 : 52; hL.y = up ? 56 : 104;
+      hR.x = up ? 68 : 86; hR.y = up ? 104 : 56;
+      fL.y = GY - (up ? 6 : 0); fR.y = GY - (up ? 0 : 6);
+      tilt = Math.sin(t * 5) * 0.16;
+    } else if (F.mode === 'highfive') {
+      var hf = Math.sin(clamp((now - F.t0) / F.dur, 0, 1) * Math.PI);
+      if (F.key === 'vinay') { hR.x = 92; hR.y = 62 - 10 * hf; hL.x = 42; hL.y = 112; }
+      else { hL.x = 28; hL.y = 62 - 10 * hf; hR.x = 78; hR.y = 112; }
+      headY -= 3 * hf; tilt = F.key === 'vinay' ? -0.1 * hf : 0.1 * hf;
+    } else if (F.mode === 'yawn') {
+      hip.y += 4; chest.y += 4; headY += 9; tilt = 0.12;
+      hL.y += 7; hR.y += 7; fL.x -= 2; fR.x += 2;
+    } else { /* idle — breathe, sway, micro-life */
+      hip.x += sway; chest.x += sway * 1.2 + F.gaze.x * 2; headX += sway * 1.3 + F.gaze.x * 4.5;
+      var b2 = (br * 0.5 + 0.5);
+      chest.y -= b2 * 1.8; headY -= b2 * 2.2 + F.gaze.y * 2;
+      hL.x += sway * 0.8; hR.x += sway * 0.8;
+      hL.y += Math.sin(t * 1.7 + F.breath) * 1.2; hR.y += Math.sin(t * 1.7 + F.breath + 1) * 1.2;
+      tilt = F.gaze.x * 0.08;
     }
-    var legA = f.mode === 'walk' ? swing : (f.mode === 'jump' ? 14 : idleSway * 0.4);
-    var armA = f.mode === 'walk' ? swing : (f.mode === 'jump' ? 0 : idleSway);
 
-    if (f.mode === 'jump') {
-      /* arms thrown up */
-      f.armL.setAttribute('transform', 'rotate(-118 17 25)');
-      f.armR.setAttribute('transform', 'rotate(118 27 25)');
-    } else if (f.mode === 'highfive') {
-      /* inside arm raised for the slap */
-      if (f.key === 'vinay') {
-        f.armR.setAttribute('transform', 'rotate(-96 27 25)');
-        f.armL.setAttribute('transform', 'rotate(-24 17 25)');
-      } else {
-        f.armL.setAttribute('transform', 'rotate(-84 17 25)');
-        f.armR.setAttribute('transform', 'rotate(24 27 25)');
-      }
-    } else {
-      /* legs swing opposite arms */
-      f.legL.setAttribute('transform', 'rotate(' + ((-12 + legA).toFixed(2)) + ' 22 42)');
-      f.legR.setAttribute('transform', 'rotate(' + ((12 - legA).toFixed(2)) + ' 22 42)');
-      f.armL.setAttribute('transform', 'rotate(' + ((-26 - armA).toFixed(2)) + ' 17 25)');
-      f.armR.setAttribute('transform', 'rotate(' + ((26 + armA).toFixed(2)) + ' 27 25)');
+    /* crouch (jump anticipation) */
+    if (F.crouch > 0.01) {
+      hip.y += 9 * F.crouch; chest.y += 7 * F.crouch; headY += 6 * F.crouch;
+      hL.y -= 4 * F.crouch; hR.y -= 4 * F.crouch;
+    }
+    /* dizzy wobble */
+    if (F.dizzy > 0.01) { tilt += Math.sin(t * 18) * 0.2 * F.dizzy; headX += Math.sin(t * 15) * 3 * F.dizzy; }
+
+    /* smooth joints toward targets */
+    var j = dampRate(F.mode === 'walk' || F.mode === 'dance' || F.mode === 'thrown' ? 26 : 11, dt);
+    F.hip.x = lerp(F.hip.x, hip.x, j); F.hip.y = lerp(F.hip.y, hip.y, j);
+    F.chest.x = lerp(F.chest.x, chest.x, j); F.chest.y = lerp(F.chest.y, chest.y, j);
+    F.handL.x = lerp(F.handL.x, hL.x, j); F.handL.y = lerp(F.handL.y, hL.y, j);
+    F.handR.x = lerp(F.handR.x, hR.x, j); F.handR.y = lerp(F.handR.y, hR.y, j);
+    F.footL.x = lerp(F.footL.x, fL.x, j); F.footL.y = lerp(F.footL.y, fL.y, j);
+    F.footR.x = lerp(F.footR.x, fR.x, j); F.footR.y = lerp(F.footR.y, fR.y, j);
+    F.headTiltT = tilt;
+    /* springy head (lag = life) */
+    var hx = F.head, k2 = 170;
+    hx.vx += ((headX - hx.x) * k2) * dt; hx.vx *= Math.exp(-11 * dt); hx.x += hx.vx * dt;
+    hx.vy += ((headY - hx.y) * k2) * dt; hx.vy *= Math.exp(-11 * dt); hx.y += hx.vy * dt;
+
+    var shX = F.chest.x, shY = F.chest.y + 6;   /* shoulder follows chest */
+    /* IK solves — knees forward(+x bend by side), elbows out-back */
+    var kL = solveIK(F.hip.x - 2, F.hip.y, F.footL.x, F.footL.y, L_UPPER, L_LOWER, -1);
+    var kR = solveIK(F.hip.x + 2, F.hip.y, F.footR.x, F.footR.y, L_UPPER, L_LOWER, 1);
+    var eL = solveIK(shX - 2, shY, F.handL.x, F.handL.y, A_UPPER, A_LOWER, -1);
+    var eR = solveIK(shX + 2, shY, F.handR.x, F.handR.y, A_UPPER, A_LOWER, 1);
+
+    function setL(el, x1, y1, x2, y2) { el.setAttribute('x1', x1.toFixed(1)); el.setAttribute('y1', y1.toFixed(1)); el.setAttribute('x2', x2.toFixed(1)); el.setAttribute('y2', y2.toFixed(1)); }
+    function setC(el, cx, cy) { el.setAttribute('cx', cx.toFixed(1)); el.setAttribute('cy', cy.toFixed(1)); }
+
+    setL(E.thighL, F.hip.x - 2, F.hip.y, kL.jx, kL.jy); setL(E.shinL, kL.jx, kL.jy, kL.bx, kL.by); setC(E.footL, kL.bx, kL.by);
+    setL(E.thighR, F.hip.x + 2, F.hip.y, kR.jx, kR.jy); setL(E.shinR, kR.jx, kR.jy, kR.bx, kR.by); setC(E.footR, kR.bx, kR.by);
+    setL(E.spine, F.hip.x, F.hip.y, F.chest.x, F.chest.y); setC(E.hip, F.hip.x, F.hip.y);
+    setL(E.upArmL, shX - 2, shY, eL.jx, eL.jy); setL(E.foArmL, eL.jx, eL.jy, eL.bx, eL.by); setC(E.handL, eL.bx, eL.by);
+    setL(E.upArmR, shX + 2, shY, eR.jx, eR.jy); setL(E.foArmR, eR.jx, eR.jy, eR.bx, eR.by); setC(E.handR, eR.bx, eR.by);
+
+    /* tie swing */
+    if (E.tieLine) {
+      var tsw = Math.sin(t * 3.2 + F.breath) * 3 + F.lean * 40 + (F.mode === 'walk' ? Math.sin(F.phase) * 2 : 0);
+      setL(E.tieLine, F.chest.x, F.chest.y + 8, F.chest.x + tsw, F.chest.y + 20);
+      E.tieKnot.setAttribute('d', 'M' + (F.chest.x + tsw).toFixed(1) + ' ' + (F.chest.y + 20).toFixed(1) +
+        ' l4.5 6 -4.5 6 -4.5 -6 z');
     }
 
-    /* blink: hide eyes */
-    f.eyes.setAttribute('opacity', blinking ? '0' : '1');
-
-    /* sparkle twinkle (Vinay only) */
-    if (f.sparkle) {
-      f.sparkle.setAttribute('opacity', (0.55 + 0.45 * Math.sin(now / 340)).toFixed(2));
+    /* head group: position + tilt */
+    var tiltDeg = (F.headTilt * 57.3).toFixed(1);
+    E.headG.setAttribute('transform', 'translate(' + (hx.x - HEAD.x).toFixed(1) + ' ' + (hx.y - HEAD.y).toFixed(1) + ') rotate(' + tiltDeg + ' 60 50)');
+    /* headband tails flutter */
+    if (E.bandT1) {
+      var fl1 = Math.sin(t * 9) * 3 - F.vx * 0.004;
+      E.bandT1.setAttribute('x2', (78 + fl1).toFixed(1)); E.bandT1.setAttribute('y2', (36 + Math.cos(t * 7) * 2).toFixed(1));
+      E.bandT2.setAttribute('x2', (77 + fl1 * 0.7).toFixed(1));
     }
+    /* eyes: blink + pupils track gaze */
+    var eyeRy = blinking ? 0.25 : 2.4;
+    E.eyeL.setAttribute('ry', eyeRy.toFixed(2)); E.eyeR.setAttribute('ry', eyeRy.toFixed(2));
+    var px = F.gaze.x * 1.1, py = F.gaze.y * 1.2;
+    E.pupL.setAttribute('cx', (55 + px).toFixed(1)); E.pupL.setAttribute('cy', (49.5 + py).toFixed(1));
+    E.pupR.setAttribute('cx', (65 + px).toFixed(1)); E.pupR.setAttribute('cy', (49.5 + py).toFixed(1));
+    E.pupL.setAttribute('opacity', blinking ? 0 : 1); E.pupR.setAttribute('opacity', blinking ? 0 : 1);
+    /* mouth: smile <-> frown morph + open (surprise/yawn) */
+    var sm = clamp(F.smile, -1, 1);
+    E.mouth.setAttribute('d', 'M55 57 Q60 ' + (57 + sm * 4.2).toFixed(1) + ' 65 57');
+    E.mouth.setAttribute('opacity', (0.92 * (1 - F.mouthOpen)).toFixed(2));
+    E.mouthOpen.setAttribute('opacity', (F.mouthOpen * 0.95).toFixed(2));
+    E.mouthOpen.setAttribute('ry', (1.5 + F.mouthOpen * 2.4).toFixed(2));
 
-    /* shadow: shrink slightly when airborne */
-    var air = clamp(Math.abs(f.yOff) / 40, 0, 1);
-    f.shadow.setAttribute('opacity', (0.26 * (1 - air * 0.65)).toFixed(2));
-    f.shadow.setAttribute('transform', 'scale(' + (1 - air * 0.35).toFixed(3) + ' 1)');
+    /* squash & stretch around feet */
+    E.squash.setAttribute('transform', 'translate(60 158) scale(' + F.squashX.toFixed(3) + ' ' + F.squashY.toFixed(3) + ') translate(-60 -158)');
+    /* shadow */
+    var airH = clamp(Math.abs(F.yOff) / 60, 0, 1);
+    E.shadow.setAttribute('opacity', (0.32 * (1 - airH * 0.6)).toFixed(2));
+    E.shadow.setAttribute('rx', (17 * (1 - airH * 0.3)).toFixed(1));
 
-    /* world position — this is the ONLY place position is set */
-    f.el.style.transform = 'translate3d(' + f.x.toFixed(2) + 'px,' + (f.y + f.yOff).toFixed(2) + 'px,0)';
+    /* world position */
+    F.el.style.transform = 'translate3d(' + F.x.toFixed(1) + 'px,' + (F.y + F.yOff).toFixed(1) + 'px,0)';
   }
 
   function frame(now) {
     rafId = requestAnimationFrame(frame);
-    var dt = Math.min(50, now - last);
-    last = now;
+    var dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
+    lastT = now;
     var t = now / 1000;
-    updateFigure(figures.vinay, now, t, dt);
-    updateFigure(figures.nitin, now, t, dt);
+    if (figures.vinay) updateFigure(figures.vinay, now, dt, t);
+    if (figures.nitin) updateFigure(figures.nitin, now, dt, t);
   }
 
-  /* ============================================================
-     CALM SCHEDULER — 8-20s between actions
-     ============================================================ */
-  function scheduleNext() {
-    timers.push(setTimeout(function () {
-      if (!stage || hidden) { if (stage) scheduleNext(); return; }
-      if (document.hidden) { scheduleNext(); return; }
-      var roll = Math.random();
-      if (roll < 0.82) {
-        var k = Math.random() < 0.5 ? 'vinay' : 'nitin';
-        if (!startWalk(k)) scheduleNext();
-      } else if (roll < 0.94) {
-        maybeHighFive();
-      }
-      scheduleNext();
-    }, randBetween(8000, 20000)));
-  }
-
-  /* ============================================================
-     GEOMETRY
-     ============================================================ */
+  /* ---------------- geometry ---------------- */
   function measure() {
-    VIEW_W = window.innerWidth;
-    VIEW_H = window.innerHeight;
-    FLOOR_Y = VIEW_H - 78;               /* figure sits ~14px above the bottom */
-    MIN_X = 34;
-    MAX_X = Math.max(MIN_X + 60, VIEW_W - 34 - W);
-    ['vinay', 'nitin'].forEach(function (k) {
-      var f = figures[k];
-      if (!f) return;
-      f.x = clamp(f.x, MIN_X, MAX_X);
-      f.y = FLOOR_Y;
+    var mobile = window.innerWidth <= 820;
+    figW = mobile ? 70 : 88;
+    floorPad = mobile ? 84 : 12;
+    MIN_X = 8; MAX_X = Math.max(80, window.innerWidth - figW - 8);
+    var floorY = window.innerHeight - floorPad - figW * 1.55;
+    Object.keys(figures).forEach(function (k2) {
+      var F = figures[k2];
+      F.x = clamp(F.x, MIN_X, MAX_X);
+      F.y = floorY;
+      F.el.style.width = figW + 'px';
     });
   }
 
-  /* ============================================================
-     TOGGLE BUTTON (32px, semi-transparent, bottom-right)
-     ============================================================ */
+  /* ---------------- toggle ---------------- */
   function buildToggle() {
     toggleBtn = document.createElement('button');
     toggleBtn.className = 'stickmen-toggle';
-    toggleBtn.id = 'stickmenToggle';
     toggleBtn.type = 'button';
-    toggleBtn.textContent = '🧍';
-    toggleBtn.setAttribute('aria-label', 'Toggle Vinay and Nitin');
+    toggleBtn.innerHTML = '<span class="st-ico">◠‿◠</span>';
+    toggleBtn.setAttribute('aria-label', 'Toggle Vinay and Nitin mascots');
     toggleBtn.setAttribute('aria-pressed', 'false');
-    toggleBtn.setAttribute('title', 'Toggle Vinay & Nitin');
+    toggleBtn.title = 'Vinay & Nitin — tap to hide/show';
     document.body.appendChild(toggleBtn);
     toggleBtn.addEventListener('click', function () {
       hidden = !hidden;
       document.body.classList.toggle('stickmen-hidden', hidden);
-      toggleBtn.textContent = hidden ? '🙈' : '🧍';
       toggleBtn.setAttribute('aria-pressed', String(hidden));
-      if (hidden) {
-        cancelAnimationFrame(rafId);
-        timers.forEach(clearTimeout);
-        timers = [];
-      } else if (!REDUCED) {
-        last = performance.now();
-        rafId = requestAnimationFrame(frame);
-        scheduleNext();
-      }
+      toggleBtn.classList.toggle('off', hidden);
+      if (hidden) { cancelAnimationFrame(rafId); timers.forEach(clearTimeout); timers = []; }
+      else if (!REDUCED) { lastT = performance.now(); rafId = requestAnimationFrame(frame); schedule(); }
     });
   }
 
-  /* ============================================================
-     INIT / DESTROY
-     ============================================================ */
+  /* ---------------- init / destroy ---------------- */
   function init() {
     if (stage) return;
     stage = document.createElement('div');
     stage.className = 'stickmen-stage';
     stage.id = 'stickmenStage';
     document.body.appendChild(stage);
-
     measure();
     window.addEventListener('resize', measure, { passive: true });
+    window.addEventListener('pointermove', function (e) {
+      pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true;
+    }, { passive: true });
+    document.addEventListener('pointerdown', function (e) {
+      /* glance at taps anywhere */
+      if (IS_TOUCH) { pointer.x = e.clientX; pointer.y = e.clientY; pointer.active = true; }
+    }, { passive: true });
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) cancelAnimationFrame(rafId);
+      else if (!hidden && !REDUCED) { lastT = performance.now(); rafId = requestAnimationFrame(frame); }
+    });
 
-    figures.vinay = buildFigure('vinay', 'Vinay', MIN_X + randBetween(0, 120));
-    figures.nitin = buildFigure('nitin', 'Nitin', Math.max(MIN_X + 140, MAX_X - randBetween(0, 120)));
-
-    /* static render once (always) so the pose shows even with reduced motion */
-    var t = performance.now() / 1000;
-    renderFigure(figures.vinay, 1, 0, false);
-    renderFigure(figures.nitin, 1, 0, false);
-
+    figures.vinay = buildFigure('vinay', 'Vinay', clamp(window.innerWidth * 0.12, MIN_X, MAX_X));
+    figures.nitin = buildFigure('nitin', 'Nitin', clamp(window.innerWidth * 0.8, MIN_X, MAX_X));
+    measure();
     buildToggle();
 
-    if (!REDUCED) {
-      last = performance.now();
-      rafId = requestAnimationFrame(frame);
-      scheduleNext();
-    } else {
-      /* reduced motion: static pose only, but clicks still bubble */
-      var vEl = figures.vinay.el;
-      vEl.addEventListener('click', function () {
-        if (performance.now() - figures.vinay.lastBubble >= BUBBLE_COOLDOWN) {
-          figures.vinay.lastBubble = performance.now();
-          var l2 = siteLines("vinay"); bubble(vEl, l2[Math.floor(Math.random() * l2.length)], 2600);
-        }
-      });
+    /* first paint even with reduced motion */
+    var n = performance.now();
+    renderFigure(figures.vinay, n, 0.016, n / 1000, false);
+    renderFigure(figures.nitin, n, 0.016, n / 1000, false);
+    if (REDUCED) {
+      figures.vinay.el.addEventListener('click', function () { if (canBubble(figures.vinay)) say(figures.vinay, pick(siteLines()), 2600); });
+      figures.nitin.el.addEventListener('click', function () { if (canBubble(figures.nitin)) say(figures.nitin, pick(siteLines()), 2600); });
+      return;
     }
+    lastT = performance.now();
+    rafId = requestAnimationFrame(frame);
+    schedule();
+    /* welcome wave shortly after load */
+    later(function () {
+      if (!hidden && figures.vinay.mode === 'idle') { doWave(figures.vinay, 1800); }
+      later(function () { if (!hidden && figures.nitin.mode === 'idle') doWave(figures.nitin, 1800); }, 900);
+    }, 2500);
   }
 
   function destroy() {
     cancelAnimationFrame(rafId);
-    timers.forEach(clearTimeout);
-    timers = [];
+    timers.forEach(clearTimeout); timers = [];
     if (stage) { stage.remove(); stage = null; }
     figures = {};
     if (toggleBtn) { toggleBtn.remove(); toggleBtn = null; }
   }
 
-  window.StickMen = { init: init, destroy: destroy, bubble: bubble, sparkle: sparkle };
+  window.StickMen = { __v: 5, init: init, destroy: destroy, celebrate: celebrate, say: function (k, t) { var F = figures[k]; if (F) say(F, t); }, wave: function (k) { var F = figures[k]; if (F) doWave(F, 1700); } };
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      if (!stage && !document.body.classList.contains('stickmen-hidden')) init();
-    });
-  }
+    document.addEventListener('DOMContentLoaded', function () { if (!stage) init(); });
+  } else if (!stage) { init(); }
 })();

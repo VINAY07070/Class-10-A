@@ -1,0 +1,5 @@
+# AIA Class 10-A Hub — runtime / local files
+render-data.json
+node_modules/
+.DS_Store
+*.log

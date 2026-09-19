@@ -77,5 +77,9 @@
     });
   }
 
+  App.observeReveals(listEl);
+  var anT = 0;
+  window.__aiaRefresh = function () { clearTimeout(anT); anT = setTimeout(function () { render(); App.observeReveals(listEl); }, 300); };
+
   render();
 })();

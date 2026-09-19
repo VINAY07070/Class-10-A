@@ -12,7 +12,11 @@
   </script>
 
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#070b16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>AIA Class 10-A Hub — Welcome</title>
   <meta name="description" content="AIA Class 10-A digital hub — students, teachers, homework, scores, chat, polls, subject resources, and AI study bot.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -147,6 +151,18 @@
     </div>
   </div>
 
+  <!-- LIVE STATS -->
+  <section class="section" style="padding-bottom:0" aria-label="Live class stats">
+    <div class="container">
+      <div class="info-strip" data-stagger id="homeStats">
+        <div class="strip-cell"><div class="strip-value" data-count="33" id="statStudents">0</div><div class="strip-label">Students</div></div>
+        <div class="strip-cell"><div class="strip-value" data-count="6" id="statTeachers">0</div><div class="strip-label">Teachers</div></div>
+        <div class="strip-cell"><div class="strip-value" data-count="0" id="statHomework">0</div><div class="strip-label">Homeworks</div></div>
+        <div class="strip-cell"><div class="strip-value" data-count="0" id="statChat">0</div><div class="strip-label">Chat messages</div></div>
+      </div>
+    </div>
+  </section>
+
   <!-- FEATURE CARDS -->
   <section class="section">
     <div class="container">
@@ -165,7 +181,7 @@
         <a href="chat.html" class="feature-card" data-tilt data-reveal>
           <div class="feature-icon" style="background:rgba(56,224,255,.15);color:#38e0ff"><i class="fa-solid fa-message"></i></div>
           <h3 class="feature-new">Student Chat</h3>
-          <p>Private login, class chatroom, your name only. Admin sees all.</p>
+          <p>Live group chat for the whole class — everyone sees everyone.</p>
           <span class="feature-link">Chat now →</span>
         </a>
         <a href="subjects.html" class="feature-card" data-tilt data-reveal>

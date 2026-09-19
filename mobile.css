@@ -1,46 +1,208 @@
-/* Mobile performance and layout fixes. */
-html { -webkit-text-size-adjust: 100%; }
-body { min-width: 0; overscroll-behavior-x: none; }
-@media (max-width: 760px) {
-  :root { --navbar-h: 62px; }
-  .navbar-inner { width: calc(100% - 24px); gap: 8px; }
-  .navbar-links, .navbar-clock { display: none; }
-  .navbar-toggle { display: flex; flex: 0 0 44px; }
-  .navbar-brand { font-size: .95rem; }
-  .brand-logo { width: 34px; height: 34px; }
-  .hero { min-height: 100svh; padding: calc(var(--navbar-h) + 34px) 16px 70px; }
-  .hero-eyebrow { font-size: .62rem; letter-spacing: .12em; padding: 7px 11px; max-width: 100%; }
-  .hero-title .line-top { font-size: 1rem; letter-spacing: .18em; }
-  .hero-title .line-glow { font-size: clamp(2.25rem, 12vw, 4rem); }
-  .hero-actions { flex-direction: column; align-items: stretch; padding: 0 8px; }
-  .hero-actions .btn, .login-btn { width: 100%; min-height: 48px; }
-  .hero-float { display: none; }
-  .section { padding: 54px 0; }
-  .container { width: min(100% - 28px, 1200px); }
-  .section-head { margin-bottom: 30px; }
-  .features-grid, .feature-grid, .stats-grid, .info-strip { grid-template-columns: 1fr; gap: 14px; }
-  .info-strip { margin-top: -22px; }
-  .glass-card { padding: 20px 16px; border-radius: 16px; }
-  .page-header { padding: calc(var(--navbar-h) + 38px) 14px 28px; }
-  .page-header p { font-size: .92rem; }
-  .login-overlay { min-height: 100svh; padding: 18px 12px; overflow-y: auto; }
-  .login-stage { width: min(100%, 440px); }
-  .login-brand { margin-bottom: 18px; }
-  .login-school { font-size: .72rem; letter-spacing: .12em; }
-  .login-body { padding: 18px 14px; }
-  .login-modes { gap: 6px; }
-  .login-mode-chip { flex: 1; min-height: 44px; padding: 9px 8px; }
-  .login-field input { min-height: 50px; font-size: 16px; }
-  .login-foot { flex-wrap: wrap; gap: 8px; font-size: .68rem; }
-  .marquee-track { animation-duration: 46s; }
-  .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .quick-link { padding: 15px 10px; font-size: .82rem; }
-  .chat-app-header { flex-direction: column; align-items: stretch; gap: 12px; }
-  .chat-app-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .chat-app-actions button:last-child { grid-column: 1 / -1; }
-  input, select, textarea { max-width: 100%; }
-  .tabbar { padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+/* ============================================================
+   MOBILE.CSS — smartphone-first optimization pass
+   360px → 820px phones & small tablets. Touch targets ≥44px,
+   safe-area aware, no horizontal scroll, no iOS input zoom.
+   ============================================================ */
+
+/* ---------- base ---------- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { min-width: 0; overflow-x: hidden; overscroll-behavior-x: none; }
+button, .btn, a, input, select, textarea, .poll-option { touch-action: manipulation; }
+* { -webkit-tap-highlight-color: transparent; }
+img { max-width: 100%; height: auto; }
+
+/* never let anything force horizontal scroll */
+.container, .page-header, .section, .hero-content, .chat-app, .chat-container,
+.admin-form, .subject-card, .poll-card, .announcement-card, .homework-item {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
+
+/* ---------- ≤1024px: tablets ---------- */
+@media (max-width: 1024px) {
+  .features-grid, .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .subject-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- ≤860px: navbar → drawer + tabbar ---------- */
+@media (max-width: 860px) {
+  :root { --navbar-h: 62px; }
+  .navbar-inner { width: calc(100% - 20px); gap: 8px; }
+  .navbar-links, .navbar-clock { display: none !important; }
+  .navbar-toggle { display: flex; flex: 0 0 44px; min-height: 44px; }
+  .navbar-brand { font-size: .95rem; }
+  .brand-logo { width: 34px; height: 34px; font-size: .95rem; }
+  body.has-tabbar { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+  .tabbar { display: flex; padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
+  .tabbar-item { min-height: 52px; justify-content: center; }
+  .scroll-progress { top: 0; }
+}
+
+/* ---------- ≤760px: phones ---------- */
+@media (max-width: 760px) {
+  .container { width: calc(100% - 28px); padding-left: 0; padding-right: 0; }
+  .section { padding: 52px 0; }
+  .section-head { margin-bottom: 28px; }
+  .heading-lg { font-size: clamp(1.5rem, 6.4vw, 2rem); }
+  .heading-md { font-size: clamp(1.15rem, 4.6vw, 1.4rem); }
+
+  /* hero */
+  .hero { min-height: 100svh; padding: calc(var(--navbar-h) + 30px) 14px 64px; }
+  .hero-eyebrow { font-size: .62rem; letter-spacing: .12em; padding: 7px 11px; max-width: 100%; white-space: normal; text-align: center; }
+  .hero-title .line-top { font-size: .95rem; letter-spacing: .2em; }
+  .hero-title .line-glow { font-size: clamp(2.2rem, 11.5vw, 3.6rem); line-height: 1.08; }
+  .hero-subtitle { font-size: .93rem; padding: 0 6px; }
+  .hero-actions { flex-direction: column; align-items: stretch; padding: 0 6px; gap: 10px; }
+  .hero-actions .btn { width: 100%; min-height: 50px; justify-content: center; }
+  .hero-float { display: none !important; }
+  .scroll-indicator { display: none; }
+
+  /* grids & cards */
+  .features-grid, .feature-grid, .stats-grid, .info-strip,
+  .subject-grid, .teacher-grid, .analytics-grid, .admin-stat-grid {
+    grid-template-columns: 1fr; gap: 12px;
+  }
+  .info-strip { margin-top: -20px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .info-strip .strip-cell { padding: 14px 10px; }
+  .info-strip .strip-value { font-size: 1.3rem; }
+  .glass-card { padding: 20px 16px; border-radius: 18px; }
+  .feature-card { padding: 22px 18px; }
+  .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .quick-link { padding: 14px 10px; font-size: .8rem; gap: 10px; }
+  .quick-link i { width: 36px; height: 36px; font-size: .9rem; }
+  .dash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .teacher-spotlight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+  /* page headers */
+  .page-header { padding: calc(var(--navbar-h) + 34px) 14px 26px; }
+  .page-header p { font-size: .9rem; }
+  .page-icon { width: 62px; height: 62px; font-size: 1.6rem; border-radius: 20px; }
+
+  /* login overlay */
+  .login-overlay { min-height: 100svh; min-height: 100dvh; padding: 16px 12px calc(20px + env(safe-area-inset-bottom)); overflow-y: auto; align-items: flex-start; }
+  .login-stage { width: min(100%, 440px); margin: auto 0; padding: 26px 0 10px; }
+  .login-brand { margin-bottom: 16px; }
+  .login-logo { width: 60px; height: 60px; font-size: 1.6rem; }
+  .login-school { font-size: .66rem; letter-spacing: .14em; }
+  .login-body { padding: 18px 14px; border-radius: 20px; }
+  .login-modes { gap: 6px; }
+  .login-mode-chip { flex: 1; min-height: 46px; padding: 9px 6px; font-size: .82rem; }
+  .login-field { padding: 12px 14px; }
+  .login-field input { min-height: 26px; font-size: 16px !important; }
+  .login-btn { min-height: 50px; font-size: .98rem; }
+  .login-foot { gap: 8px; font-size: .68rem; }
+  .login-scrollhint { display: none; }
+
+  /* marquee */
+  .marquee-track { animation-duration: 44s; gap: 30px; }
+  .marquee-item { font-size: .78rem; }
+
+  /* students */
+  .student-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .student-card { padding: 18px 8px 14px; }
+  .student-avatar { width: 48px; height: 48px; font-size: 1rem; }
+  .search-input { font-size: 16px !important; padding: 13px 44px 13px 44px; }
+  .search-shortcut { display: none; }
+
+  /* homework / announcements / comments */
+  .homework-header { flex-direction: column; }
+  .due-badge { align-self: flex-start; }
+  .comment-row { flex-direction: column; }
+  .comment-row input { font-size: 16px !important; min-height: 46px; }
+  .comment-row .btn { width: 100%; min-height: 46px; }
+  .comment-as { max-width: 100%; }
+  .announcement-spot.spot-hero { padding: 24px 18px; }
+
+  /* polls */
+  .poll-card { padding: 20px 16px; }
+  .poll-option-content { padding: 13px 12px; gap: 8px; }
+  .poll-option-text { font-size: .86rem; }
+  .poll-option-stats { font-size: .76rem; }
+
+  /* scores table → scroll + compact */
+  .scores-table-wrap { margin: 0 -4px; border-radius: 16px; }
+  .scores-table { min-width: 640px; font-size: .82rem; }
+  .scores-table th, .scores-table td { padding: 11px 10px; }
+  .score-bar-wrap { min-width: 120px; }
+
+  /* chat (class + AI) */
+  .chat-app-header { flex-direction: column; align-items: stretch; gap: 10px; }
+  .chat-app-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .chat-app-actions .btn { min-height: 44px; justify-content: center; }
+  .chat-messages { height: calc(100dvh - 420px); min-height: 300px; max-height: 520px; padding: 14px 12px; }
+  .chat-msg { max-width: 88%; }
+  .chat-input-area { gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); position: sticky; bottom: 0; }
+  .chat-input { font-size: 16px !important; min-height: 48px; }
+  .chat-send-btn { width: 50px; height: 50px; }
+  .chat-mode-chip { min-width: 0; min-height: 44px; font-size: .8rem; padding: 10px 8px; }
+  .suggested-chips, .suggest-chip { font-size: 16px; }
+  .suggest-chip, .suggested-chip { min-height: 40px; }
+  .chat-login-box { padding: 22px 16px; }
+  .chat-login-box input { font-size: 16px !important; min-height: 48px; }
+
+  /* subjects */
+  .subject-pills { gap: 6px; }
+  .subject-pill { min-height: 42px; padding: 8px 14px; font-size: .8rem; }
+  .subject-photos { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .subject-photos img { height: 84px; }
+
+  /* admin */
+  .admin-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; margin: 0 -14px 20px; padding-left: 14px; padding-right: 14px; }
+  .admin-tab { white-space: nowrap; min-height: 46px; flex: 0 0 auto; }
+  .admin-form { padding: 20px 16px; }
+  .form-group input, .form-group select, .form-group textarea { font-size: 16px !important; min-height: 48px; }
+  .form-group textarea { min-height: 110px; }
+  .admin-table { font-size: .78rem; }
+  .admin-table th, .admin-table td { padding: 8px 6px; }
+  .theme-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .activity-item { font-size: .78rem; flex-wrap: wrap; }
+  .activity-time { margin-left: 0; width: 100%; }
+
+  /* modals → bottom sheets */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal-content { width: 100%; max-width: 100%; max-height: 92dvh; border-radius: 22px 22px 0 0; padding: 26px 18px calc(24px + env(safe-area-inset-bottom)); animation: sheetUp .38s cubic-bezier(.22,.61,.36,1); }
+  @keyframes sheetUp { from { opacity: .4; transform: translateY(60px); } to { opacity: 1; transform: none; } }
+  .modal-close { top: 12px; right: 12px; width: 40px; height: 40px; }
+  .sync-content { border-radius: 22px 22px 0 0; }
+
+  /* footer / misc */
+  .site-footer, .footer { padding-bottom: calc(30px + env(safe-area-inset-bottom)); }
+  .back-to-top { bottom: calc(76px + env(safe-area-inset-bottom)); right: 12px; width: 44px; height: 44px; }
+  .toast-container { left: 12px; right: 12px; top: calc(var(--navbar-h) + 8px); }
+  .toast { max-width: 100%; font-size: .82rem; }
+  .session-chip { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+  .sync-fab { bottom: calc(76px + env(safe-area-inset-bottom)); left: 12px; }
+  .lightbox img { max-width: 94vw; max-height: 82dvh; }
+}
+
+/* ---------- ≤380px: small phones ---------- */
+@media (max-width: 380px) {
+  .student-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .quick-grid { grid-template-columns: 1fr 1fr; }
+  .info-strip { grid-template-columns: 1fr 1fr; }
+  .hero-title .line-glow { font-size: clamp(2rem, 12vw, 2.6rem); }
+  .btn { font-size: .88rem; padding: 12px 20px; }
+}
+
+/* ---------- landscape phones (short height) ---------- */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hero { min-height: auto; padding: calc(var(--navbar-h) + 20px) 14px 40px; }
+  .login-overlay { align-items: flex-start; overflow-y: auto; }
+  .chat-messages { height: 46vh; min-height: 200px; }
+  .modal-content { max-height: 94dvh; }
+}
+
+/* ---------- touch-only refinements ---------- */
+@media (hover: none) and (pointer: coarse) {
+  .feature-card:hover, .teacher-card:hover, .student-card:hover, .subject-card:hover {
+    transform: none; /* no sticky hover lift on touch */
+  }
+  .btn-primary::after { display: none; } /* shine sweep is pointless on touch */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+}
+
+/* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }

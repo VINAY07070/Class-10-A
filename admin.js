@@ -309,22 +309,62 @@
   }
 
   var pendingPhotos = [];
+  /* Compress photos before storing (max 1200px, JPEG ~0.72) so localStorage
+     quota (~5MB) and sync codes don't explode. PNG kept only if tiny. */
+  function compressImage(dataUrl, done) {
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var MAX = 1200;
+        var w = img.width, h = img.height;
+        if (w <= MAX && h <= MAX && dataUrl.length < 350000) { done(dataUrl); return; }
+        var scale = Math.min(1, MAX / Math.max(w, h));
+        var c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * scale));
+        c.height = Math.max(1, Math.round(h * scale));
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#0d1428'; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        var out = c.toDataURL('image/jpeg', 0.72);
+        if (out.length > 900000) { /* still huge — shrink more */
+          c.width = Math.round(c.width * 0.6); c.height = Math.round(c.height * 0.6);
+          var ctx2 = c.getContext('2d');
+          ctx2.fillStyle = '#0d1428'; ctx2.fillRect(0, 0, c.width, c.height);
+          ctx2.drawImage(img, 0, 0, c.width, c.height);
+          out = c.toDataURL('image/jpeg', 0.62);
+        }
+        done(out);
+      } catch (e) { done(dataUrl); }
+    };
+    img.onerror = function () { done(null); };
+    img.src = dataUrl;
+  }
   function handlePhotoPick(e) {
-    var files = Array.from(e.target.files || []);
+    var files = Array.from(e.target.files || []).slice(0, 8);
     var preview = document.getElementById('subjPhotoPreview');
-    var remaining = pendingPhotos.length;
+    if (!files.length) return;
+    App.showToast('Compressing ' + files.length + ' photo(s)…', 'info');
+    var done = 0;
     files.forEach(function (file) {
-      if (!file.type || file.type.indexOf('image/') !== 0) return;
+      if (!file.type || file.type.indexOf('image/') !== 0) { done++; return; }
+      if (file.size > 12 * 1024 * 1024) { App.showToast(file.name + ' is over 12MB — skipped', 'error'); done++; return; }
       var reader = new FileReader();
       reader.onload = function (ev) {
-        pendingPhotos.push(ev.target.result);
-        var img = document.createElement('img');
-        img.src = ev.target.result;
-        img.alt = 'new photo';
-        if (preview) preview.appendChild(img);
+        compressImage(ev.target.result, function (small) {
+          done++;
+          if (!small) { App.showToast('Could not read an image — skipped', 'error'); return; }
+          pendingPhotos.push(small);
+          var img = document.createElement('img');
+          img.src = small;
+          img.alt = 'new photo';
+          if (preview) preview.appendChild(img);
+          if (done === files.length) App.showToast(files.length + ' photo(s) ready — tap Save ✓', 'success');
+        });
       };
+      reader.onerror = function () { done++; App.showToast('Could not read ' + file.name, 'error'); };
       reader.readAsDataURL(file);
     });
+    e.target.value = '';
   }
 
   function saveSubject() {
@@ -334,10 +374,16 @@
     var name = sel.value;
     var content = DataStore.getSubjectContentFor(name) || {};
     content.notes = notesEl.value;
-    DataStore.setSubjectContent(name, content);
+    if (DataStore.setSubjectContent(name, content) === false) {
+      App.showToast('Could not save — storage is full', 'error');
+      return;
+    }
     if (pendingPhotos.length) {
       var photos = DataStore.getSubjectPhotoList(name).concat(pendingPhotos);
-      DataStore.setSubjectPhoto(name, photos);
+      if (DataStore.setSubjectPhoto(name, photos) === false) {
+        App.showToast('Photos NOT saved — storage full. Notes were saved. Remove old photos first.', 'error');
+        return;
+      }
       pendingPhotos = [];
     }
     App.showToast(name + ' saved ✅', 'success');
@@ -506,7 +552,7 @@
     });
 
     var subjSel = document.getElementById('subjSelect');
-    if (subjSel) subjSel.addEventListener('change', loadSubjectFields);
+    if (subjSel) subjSel.addEventListener('change', function () { pendingPhotos = []; loadSubjectFields(); });
     var photoInput = document.getElementById('subjPhotoInput');
     if (photoInput) photoInput.addEventListener('change', handlePhotoPick);
     var saveSubj = document.getElementById('saveSubjBtn');
@@ -581,6 +627,45 @@
     });
   }
 
+  /* ---------- serverless sync card (Settings panel) ---------- */
+  function injectSyncCard() {
+    if (document.getElementById('syncAdminCard')) return;
+    var settings = document.getElementById('panel-settings');
+    if (!settings) return;
+    var card = document.createElement('div');
+    card.className = 'admin-form';
+    card.id = 'syncAdminCard';
+    card.innerHTML =
+      '<h3 class="heading-sm">⇄ Serverless Sync — no server needed</h3>' +
+      '<p class="text-secondary" style="font-size:.86rem;margin:6px 0 14px">Chats, polls, homework, photos & settings sync between tabs instantly. To sync another phone, open the Sync Center and share a code, file, or live P2P link.</p>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+      '<button class="btn btn-primary btn-sm" id="openSyncCenterBtn"><i class="fa-solid fa-rotate"></i> Open Sync Center</button>' +
+      '<button class="btn btn-secondary btn-sm" id="quickSyncCodeBtn"><i class="fa-solid fa-copy"></i> Copy compact code</button>' +
+      '</div>';
+    settings.insertBefore(card, settings.firstChild);
+    document.getElementById('openSyncCenterBtn').addEventListener('click', function () {
+      if (window.AiaSync) window.AiaSync.open();
+    });
+    document.getElementById('quickSyncCodeBtn').addEventListener('click', function () {
+      if (!window.AiaSync) return;
+      var code = window.AiaSync.exportCode(false);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(function () { App.showToast('Compact sync code copied ✓', 'success'); });
+      } else { window.AiaSync.open(); }
+    });
+  }
+
+  /* live: refresh lists when synced data arrives */
+  var syncT = 0;
+  window.__aiaRefresh = function () {
+    if (!DataStore.isAdminAuthed()) return;
+    clearTimeout(syncT);
+    syncT = setTimeout(function () {
+      loadDashboard(); renderActivity(); renderUserStats();
+      renderHw(); renderScores(); renderAnn(); renderPolls();
+    }, 400);
+  };
+
   /* ---------- load all ---------- */
   function loadAll() {
     fillStudentSelect();
@@ -597,5 +682,6 @@
   }
 
   bindAdds();
+  injectSyncCard();
   checkAuth();
 })();
