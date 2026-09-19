@@ -150,15 +150,12 @@
   function deleteMessage(id) {
     if (!id) return;
     var msgs = DataStore.getClassChat();
-    var idx = -1;
-    for (var i = 0; i < msgs.length; i++) if (msgs[i].id === id) { idx = i; break; }
-    if (idx < 0) return;
-    var m = msgs[idx];
+    var m = msgs.filter(function (x) { return x.id === id; })[0];
+    if (!m) return;
     var isAdmin = session && session.role === 'admin';
     if (!(isAdmin || (session && m.username === session.username))) return;
     if (!isAdmin && !confirm('Delete this message?')) return;
-    msgs.splice(idx, 1);
-    DataStore.setClassChat(msgs);
+    DataStore.deleteClassChatById(id);
     renderMessages(false);
   }
 
@@ -245,8 +242,9 @@
     clearBtn.addEventListener('click', function () {
       if (!session) return;
       if (!confirm('Delete YOUR messages from this chat?')) return;
-      var kept = DataStore.getClassChat().filter(function (m) { return m.system || m.username !== session.username; });
-      DataStore.setClassChat(kept);
+      var keep = DataStore.getClassChat().filter(function (m) { return m.system || m.username !== session.username; })
+        .map(function (m) { return m.id; });
+      DataStore.clearClassChat(keep);
       App.showToast('Your messages were cleared', 'info');
       renderMessages(false);
     });
@@ -255,7 +253,7 @@
     adminToggle.addEventListener('click', function () {
       if (!session || session.role !== 'admin') return;
       if (!confirm('ADMIN: delete ALL chat messages for everyone?')) return;
-      DataStore.setClassChat([]);
+      DataStore.clearClassChat(null);
       App.showToast('Chat cleared', 'info');
       renderMessages(false);
     });

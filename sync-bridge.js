@@ -60,6 +60,8 @@
 
   /* ---------------- synced keys ---------------- */
   var LWW = 'lww', UNION = 'union', MAP = 'map', POLLS = 'polls', PROFILES = 'profiles', SUBJ = 'subj', PHOTOS = 'photos', VOTES = 'votes', CHATKEYS = 'aichat';
+  /* Append-style, oldest-first collections that must be trimmed by time. */
+  var BY_TIME_KEYS = { 'aia_class_chat': 1, 'aia_activity_log': 1, 'aia_ai_log': 1, 'aia_class_chat_deleted': 1 };
   var SYNC_DEFS = {};
   function def(key, kind, cap) { SYNC_DEFS[key] = { kind: kind, cap: cap || 0 }; }
   ['aia_students', 'aia_teachers', 'aia_leadership', 'aia_ai_config', 'aia_github_data',
@@ -70,6 +72,7 @@
   def('aia_announcements', UNION, 300);
   def('aia_test_scores', UNION, 600);
   def('aia_class_chat', UNION, 500);
+  def('aia_class_chat_deleted', UNION, 600);
   def('aia_ai_log', UNION, 400);
   def('aia_activity_log', UNION, 400);
   def('aia_presence', MAP, 60);
@@ -121,21 +124,30 @@
     }
     return 'idx:' + i + ':' + JSON.stringify(it).slice(0, 60);
   }
-  function unionMerge(localArr, remoteArr, cap) {
+  function tsOf(it) {
+    if (!it || typeof it !== 'object') return 0;
+    var t = it.at || it.created_at || it.updatedAt || it.updated_at || it.date;
+    var n = t ? new Date(t).getTime() : 0;
+    return isNaN(n) ? 0 : n;
+  }
+  function unionMerge(localArr, remoteArr, cap, byTime) {
     localArr = Array.isArray(localArr) ? localArr : [];
     remoteArr = Array.isArray(remoteArr) ? remoteArr : [];
     var seen = {}, out = [];
     localArr.forEach(function (it, i) { var id = itemId(it, i); if (!seen[id]) { seen[id] = 1; out.push(it); } });
     var added = 0;
-    /* newest-first collections: prepend truly-new remote items */
-    var prepend = [];
+    var extra = [];
     remoteArr.forEach(function (it, i) {
       var id = itemId(it, i);
-      if (!seen[id]) { seen[id] = 1; prepend.push(it); added++; }
+      if (!seen[id]) { seen[id] = 1; extra.push(it); added++; }
     });
-    /* chat/activity/ai-log are oldest-first: append instead */
-    out = out.concat(prepend);
-    if (cap && out.length > cap) out = out.slice(out.length - cap);
+    out = out.concat(extra);
+    /* Append-style streams (chat, activity, AI logs) are oldest-first, so a
+       plain tail slice would throw away the NEWEST entries. Trim them by time. */
+    if (cap && out.length > cap) {
+      if (byTime) out = out.slice().sort(function (a, b) { return tsOf(a) - tsOf(b); });
+      out = out.slice(-cap);
+    }
     return { value: out, changed: added > 0, added: added };
   }
   function newerOf(a, b) {
@@ -152,7 +164,19 @@
       if (a === b) return { value: localV, changed: false, added: 0 };
       return { value: remoteV, changed: true, added: 1, conflict: true };
     }
-    if (kind === UNION || kind === CHATKEYS) return unionMerge(localV, remoteV, cap);
+    if (kind === UNION || kind === CHATKEYS) {
+      var byTime = (kind === CHATKEYS) || BY_TIME_KEYS[key] === 1;
+      var r = unionMerge(localV, remoteV, cap, byTime);
+      /* chat tombstones win: never resurrect a message the class deleted */
+      if (key === 'aia_class_chat') {
+        var dead = SYNC_DEFS['aia_class_chat_deleted'] ? readKey('aia_class_chat_deleted') : null;
+        if (Array.isArray(dead) && dead.length) {
+          var filtered = r.value.filter(function (m) { return !m || !m.id || dead.indexOf(m.id) === -1; });
+          if (filtered.length !== r.value.length) { r.value = filtered; r.changed = true; }
+        }
+      }
+      return r;
+    }
     if (kind === VOTES) {
       var m = Object.assign({}, localV), added = 0;
       Object.keys(remoteV || {}).forEach(function (k) { if (m[k] === undefined) { m[k] = remoteV[k]; added++; } });
@@ -461,8 +485,13 @@
     dcSend({ t: 'state', snap: snap });
   }
 
-  /* ---------------- optional server merge-bridge (deploy only) ---------------- */
+  /* ---------------- optional server merge-bridge (deploy only) ----------------
+     Only used when the site is intentionally deployed WITH server.js and the
+     page opts in via window.AIA_SERVER_HUB = true. On a pure static host this
+     stays silent (no 404 noise in the console): the live relay covers sync. */
   var serverMode = false, serverTimer = null, pushTimer = null, serverFails = 0;
+  var serverOptIn = false;
+  try { serverOptIn = window.AIA_SERVER_HUB === true; } catch (e) { serverOptIn = false; }
   var TO_SHORT = { aia_students: 'students', aia_student_profiles: 'student_profiles', aia_teachers: 'teachers', aia_leadership: 'leadership', aia_homework: 'homework', aia_announcements: 'announcements', aia_polls: 'polls', aia_test_scores: 'test_scores', aia_class_chat: 'class_chat', aia_comments: 'comments', aia_poll_votes: 'poll_votes', aia_subject_content: 'subject_content', aia_subject_photos: 'subject_photos', aia_ai_config: 'ai_config', aia_theme: 'theme', aia_activity_log: 'activity_log' };
   var TO_LONG = {}; Object.keys(TO_SHORT).forEach(function (k) { TO_LONG[TO_SHORT[k]] = k; });
   function serverPull() {
@@ -512,10 +541,12 @@
   }
   function statusHTML() {
     var tabs = Object.keys(peers).map(function (k) { return peers[k].name; });
+    var relay = (window.AiaRelay && window.AiaRelay.statusHTML) ? window.AiaRelay.statusHTML() : '';
     return '<div class="sync-stat"><span>This device</span><strong>' + device.name + '</strong></div>' +
       '<div class="sync-stat"><span>Tabs here</span><strong>' + (tabs.length ? tabs.join(', ') : 'just this one') + '</strong></div>' +
+      relay +
       '<div class="sync-stat"><span>P2P link</span><strong>' + (p2pStatus === 'live' ? 'LIVE ✓' : p2pStatus) + '</strong></div>' +
-      '<div class="sync-stat"><span>Server</span><strong>' + (serverMode ? 'connected (merge)' : 'none — serverless ✓') + '</strong></div>' +
+      '<div class="sync-stat"><span>Backup hub</span><strong>' + (serverMode ? 'connected (merge)' : 'none needed ✓') + '</strong></div>' +
       '<div class="sync-stat"><span>Last sync</span><strong>' + lastSyncInfo + (lastSyncAt ? ' · ' + timeAgo(lastSyncAt) : '') + '</strong></div>';
   }
   function buildUI() {
@@ -536,8 +567,15 @@
       '<div class="modal-content sync-content" role="dialog" aria-label="Sync Center">' +
       '<button class="modal-close" id="syncClose" aria-label="Close">✕</button>' +
       '<h2 class="heading-md">⇄ Sync Center</h2>' +
-      '<p class="text-secondary" style="font-size:.85rem;margin:6px 0 16px">Everything syncs <strong>without any server</strong>. Same-device tabs sync instantly & automatically. For other phones, use a code, file, or live P2P link.</p>' +
+      '<p class="text-secondary" style="font-size:.85rem;margin:6px 0 16px">Everything syncs <strong>automatically</strong> across your phones, tabs and PCs — no server to run. Same-device tabs are instant; other devices join the class room live below. Backup codes/files are still here if you are offline.</p>' +
       '<div class="sync-status" id="aiaSyncStatusLine"></div>' +
+      '<div class="sync-sec"><h4><i class="fa-solid fa-bolt"></i> Live class room — automatic</h4>' +
+      '<div id="aiaRelayLine" class="sync-status"></div>' +
+      '<div class="sync-row" style="margin-top:10px">' +
+      '<button class="btn btn-secondary btn-sm" id="aiaRelayToggle">Turn live link off</button>' +
+      '<button class="btn btn-secondary btn-sm" id="aiaRelayRoomBtn">Change room</button>' +
+      '<button class="btn btn-secondary btn-sm" id="aiaRelayRefreshBtn">Sync now</button></div>' +
+      '<div class="text-muted" style="font-size:.76rem;margin-top:8px">Every device using the same room stays in sync instantly. Keep the default room unless you want a private one — then set the same room on every device.</div></div>' +
       '<div class="sync-sec"><h4><i class="fa-solid fa-share-nodes"></i> 1 · Share from this device</h4>' +
       '<div class="sync-row"><button class="btn btn-primary btn-sm" id="aiaShareCompact">Copy compact code</button>' +
       '<button class="btn btn-secondary btn-sm" id="aiaShareFull">Copy FULL code</button>' +
@@ -610,6 +648,25 @@
     on('aiaP2pCloseBtn', 'click', window.__aiaP2pClose);
     on('aiaP2pMyCode', 'focus', function () { this.select(); });
 
+    /* live class room controls */
+    on('aiaRelayToggle', 'click', function () {
+      if (!window.AiaRelay) return;
+      var on = window.AiaRelay.setEnabled(!window.AiaRelay.isEnabled());
+      this.textContent = on ? 'Turn live link off' : 'Turn live link on';
+      relayLine();
+    });
+    on('aiaRelayRoomBtn', 'click', function () {
+      if (!window.AiaRelay) return;
+      var cur = window.AiaRelay.room();
+      var next = prompt('Class room name for automatic sync.\nUse the SAME room on every device.\n\nLetters, numbers, - and _ only.', cur);
+      if (next === null) return;
+      if (window.AiaRelay.setRoom(next)) { toast('Room set — reconnecting live link', 'success'); relayLine(); }
+      else toast('That room name is not valid', 'error');
+    });
+    on('aiaRelayRefreshBtn', 'click', function () {
+      if (window.AiaRelay) { window.AiaRelay.refresh(); toast('Checking the class room for updates…', 'info'); }
+    });
+
     /* footer shortcut */
     var tries = 0;
     var iv = setInterval(function () {
@@ -640,16 +697,30 @@
       ta.remove();
     }
   }
-  function openModal() { if (modal) { var st = $('aiaSyncStatusLine'); if (st) st.innerHTML = statusHTML(); modal.classList.add('open'); } }
+  function openModal() {
+    if (modal) {
+      var st = $('aiaSyncStatusLine');
+      if (st) st.innerHTML = statusHTML();
+      relayLine();
+      modal.classList.add('open');
+    }
+  }
   function closeModal() { if (modal) modal.classList.remove('open'); }
+  function relayLine() {
+    var el = $('aiaRelayLine');
+    if (el && window.AiaRelay && window.AiaRelay.statusHTML) el.innerHTML = window.AiaRelay.statusHTML();
+    var btn = $('aiaRelayToggle');
+    if (btn && window.AiaRelay) btn.textContent = window.AiaRelay.isEnabled() ? 'Turn live link off' : 'Turn live link on';
+  }
+  document.addEventListener('aia-relay-status', function () { relayLine(); });
 
   /* ---------------- boot ---------------- */
   function boot() {
     buildUI();
     bcPost({ t: 'hello', from: device.id, fromName: device.name });
-    /* optional server merge (silent if absent) */
+    /* optional server merge (only when explicitly deployed with server.js) */
     try {
-      if (location.protocol.indexOf('http') === 0) {
+      if (serverOptIn && location.protocol.indexOf('http') === 0) {
         serverPull();
         serverTimer = setInterval(serverPull, 8000);
       }

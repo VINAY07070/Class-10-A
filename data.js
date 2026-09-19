@@ -23,6 +23,7 @@ var DataStore = (function () {
     adminAuth: 'aia_admin_auth',
     session: 'aia_session',
     classChat: 'aia_class_chat',
+    classChatDeleted: 'aia_class_chat_deleted',
     aiLog: 'aia_ai_log',
     activityLog: 'aia_activity_log',
     presence: 'aia_presence',
@@ -261,16 +262,57 @@ var DataStore = (function () {
   }
 
   /* ---------- class chat ---------- */
-  function getClassChat() { return _get(KEYS.classChat, []); }
+  /* Applies the shared "deleted message ids" tombstone list, so a message
+     deleted on one device disappears for the class instead of syncing back. */
+  function _applyChatTombstones(list) {
+    var dead = _get(KEYS.classChatDeleted, []);
+    if (!Array.isArray(dead) || !dead.length) return list;
+    return (list || []).filter(function (m) { return !m || !m.id || dead.indexOf(m.id) === -1; });
+  }
+  function _markChatDeleted(ids) {
+    var dead = _get(KEYS.classChatDeleted, []);
+    var changed = false;
+    ids.forEach(function (id) { if (id && dead.indexOf(id) === -1) { dead.push(id); changed = true; } });
+    if (changed) _set(KEYS.classChatDeleted, dead.slice(-600));
+  }
+  function getClassChat() { return _applyChatTombstones(_get(KEYS.classChat, [])); }
   function addClassChat(msg) {
     if (!msg.id) msg.id = _uid('msg');
     if (!msg.at) msg.at = new Date().toISOString();
-    var l = getClassChat(); l.push(msg);
+    var l = _get(KEYS.classChat, []).filter(function (m) { return m && m.id !== msg.id; });
+    l.push(msg);
     if (l.length > 500) l = l.slice(-500);
     _set(KEYS.classChat, l); return l;
   }
   function setClassChat(l) { _set(KEYS.classChat, l); }
-  function deleteClassChat(idx) { var l = getClassChat(); l.splice(idx, 1); setClassChat(l); }
+  function deleteClassChat(idx) {
+    var l = _get(KEYS.classChat, []);
+    var m = l[idx];
+    if (m && m.id) _markChatDeleted([m.id]);
+    l.splice(idx, 1); setClassChat(l);
+  }
+  /* delete by stable id (used by chat UI + sync) */
+  function deleteClassChatById(id) {
+    if (!id) return false;
+    var l = _get(KEYS.classChat, []);
+    var out = l.filter(function (m) { return !m || m.id !== id; });
+    _markChatDeleted([id]);
+    if (out.length === l.length) return false;
+    setClassChat(out); return true;
+  }
+  /* bulk delete (admin clear-all / clear-mine) */
+  function clearClassChat(keepIds) {
+    var l = _get(KEYS.classChat, []);
+    var gone = [], keep = [];
+    l.forEach(function (m) {
+      if (!m) return;
+      if (keepIds && m.id && keepIds.indexOf(m.id) !== -1) keep.push(m);
+      else if (m.id) gone.push(m.id);
+    });
+    _markChatDeleted(gone);
+    setClassChat(keep);
+    return gone.length;
+  }
 
   /* ---------- per-user AI history + global admin log ---------- */
   function aiKey(username) { return 'aia_ai_chat_' + username; }
@@ -479,7 +521,8 @@ var DataStore = (function () {
     getSession: getSession, setSession: setSession, clearSession: clearSession, isLoggedIn: isLoggedIn, isAdminUser: isAdminUser,
     getCredentials: getCredentials, getEffectiveCredentials: getEffectiveCredentials,
     findCredentialsByName: findCredentialsByName, authenticate: authenticate, resetPassword: resetPassword,
-    getClassChat: getClassChat, addClassChat: addClassChat, setClassChat: setClassChat, deleteClassChat: deleteClassChat,
+    getClassChat: getClassChat, addClassChat: addClassChat, setClassChat: setClassChat,
+    deleteClassChat: deleteClassChat, deleteClassChatById: deleteClassChatById, clearClassChat: clearClassChat,
     getAiHistory: getAiHistory, addAiMessage: addAiMessage, clearAiHistory: clearAiHistory,
     getAiLog: getAiLog, clearAiLog: clearAiLog,
     getActivityLog: getActivityLog, logActivity: logActivity,
