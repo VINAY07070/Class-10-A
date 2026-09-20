@@ -109,6 +109,19 @@
     } finally { window.__aiaApplying = false; }
   }
 
+  /* Same-origin tabs share one localStorage, so by the time a peer's update
+     arrives the local storage read already returns the NEW value. Merging
+     against that reports "nothing changed" and the page keeps rendering the
+     old theme forever. For single-value settings like the theme the value we
+     must compare against is the one actually applied to this document. */
+  function localForMerge(k) {
+    if (k === 'aia_theme') {
+      return document.documentElement.getAttribute('data-theme') ||
+             (function () { try { return localStorage.getItem('aia_theme'); } catch (e) { return null; } })();
+    }
+    return readKey(k);
+  }
+
   /* ---------------- merge engine ---------------- */
   function itemId(it, i) {
     if (it && typeof it === 'object') {
@@ -259,7 +272,7 @@
   var lastSyncAt = 0, lastSyncInfo = 'never';
   function applyRemote(key, remoteV, from) {
     if (!isSyncedKey(key)) return 0;
-    var m = mergeValues(key, readKey(key), remoteV);
+    var m = mergeValues(key, localForMerge(key), remoteV);
     if (!m.changed) return 0;
     writeKey(key, m.value);
     meta[key] = { rev: (meta[key] && meta[key].rev || 0) + 1, at: Date.now(), by: from || 'remote' };

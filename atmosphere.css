@@ -1,0 +1,436 @@
+/* ============================================================
+   ATMOSPHERE.CSS — a signature effect for every theme
+   ------------------------------------------------------------
+   Each theme gets its own animated "weather" plus a matching card
+   treatment, so switching theme visibly changes the whole site
+   instead of just swapping colours.
+
+   The one hard rule here: every effect animates ONLY transform and
+   opacity. Those two properties run on the compositor thread, so the
+   effect stays at 60fps on a phone where `perf-lite` is on. Anything
+   that would animate filter, box-shadow, background-position or
+   clip-path — all of which repaint the layer and are what made this
+   site laggy before — is deliberately avoided.
+
+   Depth: the weather layer sits at z-index -1, above the page's
+   background (body::before, -2) and below content. It is inert
+   (`pointer-events: none`) so it never eats a tap.
+   ============================================================ */
+
+.atmo {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  /* the weather must not create a stacking context that traps the page */
+  contain: strict;
+  /* Static per-theme graphics live on this element itself and are painted
+     once, so phones keep a distinctive look. Only the animated children
+     below are desktop-only. */
+  background-repeat: repeat, repeat, no-repeat, no-repeat;
+}
+.atmo > * {
+  position: absolute;
+  will-change: transform, opacity;
+  /* children fade in so switching theme reads as a change of weather */
+  animation: atmoIn 700ms ease both;
+}
+@keyframes atmoIn {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atmo > * { display: none !important; }
+}
+
+/* ============================================================
+   STATIC THEME GRAPHICS
+   ------------------------------------------------------------
+   Four background layers painted once on the (fixed, composited)
+   atmosphere element. These give every theme a recognisable
+   graphic identity on phones and desktops alike, and because
+   nothing here animates they cost no frame time after first paint.
+
+   Layer order: fine texture (tiled) -> grid (tiled) -> big glow
+   (free) -> vignette (free).
+   ============================================================ */
+.atmo {
+  --atmo-texture: none;
+  --atmo-grid: none;
+  --atmo-glow: none;
+  --atmo-vig: none;
+  background-image: var(--atmo-texture), var(--atmo-grid),
+                    var(--atmo-glow), var(--atmo-vig);
+}
+
+/* glass — frosted micro-texture + soft corner glow */
+[data-theme="glass"] .atmo {
+  --atmo-texture: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  --atmo-glow: radial-gradient(60% 50% at 82% 0%, rgba(124, 108, 255, 0.16), transparent 70%),
+               radial-gradient(50% 45% at 4% 92%, rgba(56, 224, 255, 0.11), transparent 70%);
+}
+[data-theme="glass"] .atmo { background-size: 5px 5px, auto, auto, auto; }
+
+/* luxury — dark damask lattice + warm gold vignette */
+[data-theme="luxury"] .atmo {
+  --atmo-grid:
+    linear-gradient(45deg, rgba(245, 181, 68, 0.05) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(245, 181, 68, 0.05) 1px, transparent 1px);
+  --atmo-glow: radial-gradient(55% 45% at 50% 0%, rgba(245, 181, 68, 0.13), transparent 72%);
+  --atmo-vig: radial-gradient(120% 90% at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.55));
+}
+[data-theme="luxury"] .atmo { background-size: 28px 28px, 28px 28px, auto, auto; }
+
+/* simple — clean paper rule grid, no glow at all */
+[data-theme="simple"] .atmo {
+  --atmo-grid:
+    linear-gradient(rgba(90, 100, 130, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(90, 100, 130, 0.07) 1px, transparent 1px);
+}
+[data-theme="simple"] .atmo { background-size: 32px 32px, 32px 32px, auto, auto; }
+
+/* midnight — deep star field for phones (the twinkle layer is
+   desktop-only, so this is what a phone shows) */
+[data-theme="midnight"] .atmo {
+  --atmo-texture: radial-gradient(rgba(255, 255, 255, 0.85) 1px, transparent 1px),
+                  radial-gradient(rgba(255, 255, 255, 0.45) 1px, transparent 1px);
+  --atmo-glow: radial-gradient(60% 50% at 50% 0%, rgba(79, 140, 255, 0.16), transparent 72%);
+  --atmo-vig: radial-gradient(130% 100% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.6));
+}
+[data-theme="midnight"] .atmo { background-size: 90px 90px, 47px 47px, auto, auto; }
+
+/* neon — perspective grid painted flat + magenta corner bloom */
+[data-theme="neon"] .atmo {
+  --atmo-grid:
+    linear-gradient(rgba(0, 229, 255, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 46, 160, 0.13) 1px, transparent 1px);
+  --atmo-glow:
+    radial-gradient(55% 40% at 88% 8%, rgba(255, 46, 160, 0.20), transparent 70%),
+    radial-gradient(50% 40% at 8% 90%, rgba(0, 229, 255, 0.20), transparent 70%);
+}
+[data-theme="neon"] .atmo { background-size: 44px 44px, 44px 44px, auto, auto; }
+
+/* sunset — dune-like layered bands */
+[data-theme="sunset"] .atmo {
+  --atmo-texture: radial-gradient(rgba(255, 216, 150, 0.06) 1px, transparent 1px);
+  --atmo-glow:
+    radial-gradient(70% 50% at 50% 108%, rgba(255, 138, 61, 0.24), transparent 70%),
+    radial-gradient(55% 40% at 15% 0%, rgba(255, 77, 109, 0.15), transparent 72%);
+}
+[data-theme="sunset"] .atmo { background-size: 7px 7px, auto, auto, auto; }
+
+/* ocean — pressure waves + deep blue glow */
+[data-theme="ocean"] .atmo {
+  --atmo-grid:
+    linear-gradient(rgba(120, 230, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 230, 255, 0.06) 1px, transparent 1px);
+  --atmo-glow:
+    radial-gradient(65% 45% at 50% 0%, rgba(56, 224, 255, 0.18), transparent 72%),
+    radial-gradient(60% 50% at 90% 100%, rgba(79, 140, 255, 0.16), transparent 72%);
+  --atmo-vig: radial-gradient(125% 95% at 50% 40%, transparent 45%, rgba(0, 8, 24, 0.5));
+}
+[data-theme="ocean"] .atmo { background-size: 54px 54px, 54px 54px, auto, auto; }
+
+/* royal — fleur lattice + violet/gold corner bloom */
+[data-theme="royal"] .atmo {
+  --atmo-grid:
+    linear-gradient(45deg, rgba(124, 108, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(245, 181, 68, 0.06) 1px, transparent 1px);
+  --atmo-glow:
+    radial-gradient(50% 40% at 12% 8%, rgba(124, 108, 255, 0.17), transparent 70%),
+    radial-gradient(45% 35% at 92% 88%, rgba(245, 181, 68, 0.13), transparent 70%);
+}
+[data-theme="royal"] .atmo { background-size: 34px 34px, 34px 34px, auto, auto; }
+
+/* ============================================================
+   ANIMATED LAYER IS DESKTOP-ONLY
+   Phones already carry the static graphics above; adding the
+   moving children there costs compositor work for decoration
+   that a small screen barely shows.
+   ============================================================ */
+@media (max-width: 860px) {
+  .atmo > * { display: none !important; }
+}
+
+/* ============================================================
+   1. GLASS — light-drift. Soft caustic bands sliding across the
+      panel, like light moving through frosted glass.
+   ============================================================ */
+[data-theme="glass"] .atmo-band {
+  left: -40%;
+  width: 60%;
+  height: 190%;
+  top: -40%;
+  background: linear-gradient(100deg,
+    transparent 0%,
+    rgba(124, 108, 255, 0.10) 35%,
+    rgba(56, 224, 255, 0.13) 50%,
+    rgba(124, 108, 255, 0.10) 65%,
+    transparent 100%);
+  transform: rotate(14deg) translateY(-30%);
+  animation: atmoDrift 17s linear infinite;
+}
+[data-theme="glass"] .atmo-band.b2 {
+  left: auto;
+  right: -30%;
+  width: 42%;
+  background: linear-gradient(100deg,
+    transparent, rgba(255, 216, 137, 0.09), transparent);
+  animation-duration: 23s;
+  animation-delay: -8s;
+}
+@keyframes atmoDrift {
+  0%   { transform: rotate(14deg) translateY(-38%); }
+  100% { transform: rotate(14deg) translateY(38%); }
+}
+
+/* ============================================================
+   2. LUXURY — gold dust rising. Slow, sparse, expensive.
+   ============================================================ */
+[data-theme="luxury"] .atmo-dust {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #f5b544;
+  box-shadow: 0 0 6px rgba(245, 181, 68, 0.9);
+  animation: atmoRise linear infinite;
+  opacity: 0;
+}
+@keyframes atmoRise {
+  0%   { transform: translate3d(0, 0, 0) scale(0.5); opacity: 0; }
+  12%  { opacity: 0.85; }
+  80%  { opacity: 0.5; }
+  100% { transform: translate3d(24px, -102vh, 0) scale(1); opacity: 0; }
+}
+
+/* ============================================================
+   3. SIMPLE — folded-paper geometry, drifting slowly. Calm by
+      design, but still unmistakably animated.
+   ============================================================ */
+[data-theme="simple"] .atmo-fold {
+  width: 190px;
+  height: 190px;
+  border: 1.5px solid rgba(90, 100, 130, 0.16);
+  border-radius: 3px;
+  animation: atmoSpin linear infinite;
+  opacity: 0.5;
+}
+[data-theme="simple"] .atmo-fold.b2 {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  animation-direction: reverse;
+}
+@keyframes atmoSpin {
+  0%   { transform: rotate(0deg) translateY(0); }
+  50%  { transform: rotate(180deg) translateY(-18px); }
+  100% { transform: rotate(360deg) translateY(0); }
+}
+
+/* ============================================================
+   4. MIDNIGHT — starfield with an occasional shooting star.
+   ============================================================ */
+[data-theme="midnight"] .atmo-star {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  animation: atmoTwinkle ease-in-out infinite;
+  opacity: 0.25;
+}
+@keyframes atmoTwinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.85); }
+  50%      { opacity: 0.95; transform: scale(1.25); }
+}
+[data-theme="midnight"] .atmo-shoot {
+  width: 190px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), transparent);
+  transform: rotate(28deg) translate3d(-40vw, -25vh, 0);
+  opacity: 0;
+  animation: atmoShoot 11s ease-in infinite;
+}
+@keyframes atmoShoot {
+  0%, 76%  { transform: rotate(28deg) translate3d(-40vw, -25vh, 0); opacity: 0; }
+  79%      { opacity: 0.9; }
+  92%      { transform: rotate(28deg) translate3d(125vw, 72vh, 0); opacity: 0; }
+  100%     { transform: rotate(28deg) translate3d(125vw, 72vh, 0); opacity: 0; }
+}
+
+/* ============================================================
+   5. NEON — synthwave perspective grid plus a CRT scanline sweep.
+   ============================================================ */
+[data-theme="neon"] .atmo-grid {
+  left: -25%;
+  right: -25%;
+  height: 62vh;
+  bottom: -6vh;
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.20) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 46, 160, 0.18) 1px, transparent 1px);
+  background-size: 64px 44px;
+  transform: perspective(300px) rotateX(66deg);
+  transform-origin: bottom center;
+  opacity: 0.55;
+  animation: atmoGrid 4.5s linear infinite;
+  /* mask fades the far edge so the grid reads as receding, not cut off */
+  -webkit-mask-image: linear-gradient(transparent, #000 55%);
+  mask-image: linear-gradient(transparent, #000 55%);
+}
+@keyframes atmoGrid {
+  0%   { transform: perspective(300px) rotateX(66deg) translateY(0); }
+  100% { transform: perspective(300px) rotateX(66deg) translateY(44px); }
+}
+[data-theme="neon"] .atmo-scan {
+  left: 0;
+  right: 0;
+  height: 160px;
+  background: linear-gradient(rgba(0, 229, 255, 0), rgba(0, 229, 255, 0.07), rgba(0, 229, 255, 0));
+  animation: atmoScan 7s linear infinite;
+  opacity: 0.8;
+}
+@keyframes atmoScan {
+  0%   { transform: translate3d(0, -180px, 0); }
+  100% { transform: translate3d(0, 102vh, 0); }
+}
+
+/* ============================================================
+   6. SUNSET — layered warm haze rolling like dunes.
+   ============================================================ */
+[data-theme="sunset"] .atmo-dune {
+  left: -20%;
+  right: -20%;
+  bottom: -12vh;
+  height: 42vh;
+  border-radius: 50% 50% 0 0;
+  background: radial-gradient(60% 100% at 50% 100%,
+    rgba(255, 138, 61, 0.20), transparent 70%);
+  animation: atmoRoll ease-in-out infinite;
+}
+[data-theme="sunset"] .atmo-dune.b2 {
+  bottom: -18vh;
+  height: 34vh;
+  background: radial-gradient(60% 100% at 50% 100%,
+    rgba(255, 77, 109, 0.18), transparent 70%);
+  animation-direction: reverse;
+}
+@keyframes atmoRoll {
+  0%, 100% { transform: translate3d(-3%, 0, 0) scaleX(1); }
+  50%      { transform: translate3d(3%, -1.5vh, 0) scaleX(1.06); }
+}
+
+/* ============================================================
+   7. OCEAN — caustic light rippling on the floor, bubbles rising.
+   ============================================================ */
+[data-theme="ocean"] .atmo-caustic {
+  left: -20%;
+  right: -20%;
+  top: -10%;
+  height: 60%;
+  background: radial-gradient(50% 60% at 30% 0%, rgba(56, 224, 255, 0.16), transparent 65%),
+              radial-gradient(45% 55% at 75% 10%, rgba(79, 140, 255, 0.14), transparent 65%);
+  animation: atmoCaustic 13s ease-in-out infinite;
+}
+@keyframes atmoCaustic {
+  0%, 100% { transform: translate3d(-2%, 0, 0) scale(1); }
+  50%      { transform: translate3d(2%, 2vh, 0) scale(1.08); }
+}
+[data-theme="ocean"] .atmo-bub {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(120, 230, 255, 0.55);
+  animation: atmoRise linear infinite;
+  opacity: 0;
+}
+
+/* ============================================================
+   8. ROYAL — damask medallions turning slowly in the dark.
+   ============================================================ */
+[data-theme="royal"] .atmo-crest {
+  width: 230px;
+  height: 230px;
+  border-radius: 50%;
+  border: 1px solid rgba(124, 108, 255, 0.20);
+  box-shadow: inset 0 0 0 12px rgba(124, 108, 255, 0.05),
+              inset 0 0 0 26px rgba(245, 181, 68, 0.05);
+  animation: atmoSpin linear infinite;
+  opacity: 0.6;
+}
+[data-theme="royal"] .atmo-crest.b2 {
+  width: 150px;
+  height: 150px;
+  border-color: rgba(245, 181, 68, 0.22);
+  animation-direction: reverse;
+}
+[data-theme="royal"] .atmo-crest::after {
+  content: '';
+  position: absolute;
+  inset: 38%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 181, 68, 0.22), transparent 70%);
+}
+
+/* ============================================================
+   Per-theme card treatment — makes each theme feel "designed"
+   rather than recoloured.
+   ============================================================ */
+[data-theme="neon"] .feature-card,
+[data-theme="neon"] .glass-card,
+[data-theme="neon"] .info-card {
+  border-color: rgba(0, 229, 255, 0.26);
+}
+[data-theme="neon"] .feature-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(120deg, transparent 40%, rgba(0, 229, 255, 0.09) 50%, transparent 60%);
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+[data-theme="neon"] .feature-card:hover::after { opacity: 1; }
+
+[data-theme="luxury"] .feature-card,
+[data-theme="luxury"] .glass-card {
+  border-color: rgba(245, 181, 68, 0.24);
+}
+[data-theme="royal"] .feature-card,
+[data-theme="royal"] .glass-card {
+  border-color: rgba(124, 108, 255, 0.26);
+}
+[data-theme="ocean"] .feature-card,
+[data-theme="ocean"] .glass-card {
+  border-color: rgba(56, 224, 255, 0.20);
+}
+[data-theme="sunset"] .feature-card,
+[data-theme="sunset"] .glass-card {
+  border-color: rgba(255, 138, 61, 0.22);
+}
+[data-theme="simple"] .feature-card,
+[data-theme="simple"] .glass-card {
+  border-color: rgba(90, 100, 130, 0.22);
+}
+
+/* ============================================================
+   QUICK RAIL — replaces the home page's duplicate "Jump
+   anywhere" grid: a single compact scrollable row of the
+   shortcuts that the feature grid above does not already show.
+   ============================================================ */
+.quick-rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 12px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.quick-rail::-webkit-scrollbar { display: none; }
+.quick-rail .quick-link {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  white-space: nowrap;
+}
