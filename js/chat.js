@@ -1,1 +1,1 @@
-document.write('<script src="../chat.js"><\/script>');
+document.write('<script src="chat.js"><\/script>');

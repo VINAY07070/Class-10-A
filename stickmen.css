@@ -26,10 +26,13 @@
   transition: filter .25s ease;
 }
 .stickman:active { cursor: grabbing; }
-.stickman.grabbed { filter: drop-shadow(0 14px 22px rgba(0,0,0,.5)); z-index: 5; }
-.sm-vinay .sm-svg { filter: drop-shadow(0 0 7px rgba(157,140,255,.55)); }
-.sm-nitin .sm-svg { filter: drop-shadow(0 0 7px rgba(94,234,212,.5)); }
-.stickman:hover .sm-svg { filter: drop-shadow(0 0 12px rgba(255,255,255,.35)); }
+.stickman.grabbed { z-index: 5; }
+/* Crisp line work instead of a blurred glow: the glow forced the browser to
+   re-render a full-screen SVG filter every frame, which is what made phones
+   feel laggy. A cheap drop-shadow only while grabbed keeps it lively. */
+.stickman.grabbed .sm-svg { filter: drop-shadow(0 8px 14px rgba(0,0,0,.45)); }
+.stickman:hover .sm-svg { filter: drop-shadow(0 0 6px rgba(255,255,255,.28)); }
+.sm-vinay .sm-svg, .sm-nitin .sm-svg { filter: none; }
 
 .sm-svg {
   display: block;

@@ -1,1 +1,1 @@
-document.write('<script src="../ai.js"><\/script>');
+document.write('<script src="ai.js"><\/script>');

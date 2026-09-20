@@ -24,6 +24,7 @@ var DataStore = (function () {
     session: 'aia_session',
     classChat: 'aia_class_chat',
     classChatDeleted: 'aia_class_chat_deleted',
+    files: 'aia_files',
     aiLog: 'aia_ai_log',
     activityLog: 'aia_activity_log',
     presence: 'aia_presence',
@@ -314,6 +315,28 @@ var DataStore = (function () {
     return gone.length;
   }
 
+  /* ---------- shared files (photos, PDFs, docs) ---------- */
+  /* Only lightweight metadata lives in localStorage: the bytes are uploaded
+     to the shared relay and referenced by URL, so a phone never fills up. */
+  function getFiles() { return _get(KEYS.files, []); }
+  function addFile(file) {
+    if (!file || !file.url) return null;
+    if (!file.id) file.id = _uid('file');
+    if (!file.at) file.at = new Date().toISOString();
+    var l = getFiles().filter(function (f) { return f && f.id !== file.id; });
+    l.push(file);
+    if (l.length > 120) l = l.slice(-120);
+    _set(KEYS.files, l);
+    return file;
+  }
+  function removeFile(id) {
+    if (!id) return;
+    var l = getFiles();
+    var out = l.filter(function (f) { return !f || f.id !== id; });
+    if (out.length === l.length) return;
+    _set(KEYS.files, out);
+  }
+
   /* ---------- per-user AI history + global admin log ---------- */
   function aiKey(username) { return 'aia_ai_chat_' + username; }
   function getAiHistory(username) { return _get(aiKey(username), []); }
@@ -534,6 +557,7 @@ var DataStore = (function () {
     getGithubData: getGithubData, setGithubData: setGithubData, getGithubUrl: getGithubUrl,
     getChatMode: getChatMode, setChatMode: setChatMode,
     getTheme: getTheme, setTheme: setTheme,
+    getFiles: getFiles, addFile: addFile, removeFile: removeFile,
     exportAll: exportAll, importAll: importAll,
     resetToSeed: resetToSeed,
     getStudentCount: getStudentCount, getTeacherCount: getTeacherCount,

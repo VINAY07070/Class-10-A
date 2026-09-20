@@ -69,6 +69,7 @@
   ].forEach(function (k) { def(k, LWW); });
   def('aia_theme', LWW); // note: stored as raw string, handled specially
   def('aia_homework', UNION, 300);
+  def('aia_files', UNION, 120);
   def('aia_announcements', UNION, 300);
   def('aia_test_scores', UNION, 600);
   def('aia_class_chat', UNION, 500);

@@ -1,1 +1,1 @@
-document.write('<script src="../polls.js"><\/script>');
+document.write('<script src="polls.js"><\/script>');

@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="css/stickmen.css">
   <link rel="stylesheet" href="css/themes.css">
 
+  <script src="perf.js"></script>
 </head>
 <body>
   <div id="navbar-placeholder"></div>
@@ -71,6 +72,8 @@
         </div>
         <div class="chat-messages" id="chatMessages"></div>
         <div class="chat-input-area">
+          <input type="file" id="chatFileInput" multiple style="display:none">
+          <button class="chat-attach-btn" id="chatAttachBtn" aria-label="Attach a file" title="Send a photo, PDF or any file"><i class="fa-solid fa-paperclip"></i></button>
           <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..." autocomplete="off" maxlength="500">
           <button class="chat-send-btn" id="chatSendBtn" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
         </div>

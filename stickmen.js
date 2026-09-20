@@ -89,53 +89,48 @@
   /* ---------------- DOM ---------------- */
   function stickSVG(key) {
     var isV = key === 'vinay';
-    var ink = isV ? '#9d8cff' : '#5eead4';
+    var ink = isV ? '#a89bff' : '#5eead4';
     var inkDim = isV ? '#6a5ae0' : '#14b8a6';
     var acc = isV ? '#c4b5fd' : '#ffd889';
-    var w = isV ? 4.4 : 4.2;
+    var w = isV ? 4.6 : 4.4;
     var s = '';
     s += '<svg class="sm-svg" viewBox="0 0 120 172" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
-    s += '<defs><filter id="smGlow' + key + '" x="-60%" y="-60%" width="220%" height="220%">' +
-         '<feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>';
-    s += '<ellipse class="p-shadow" cx="60" cy="162" rx="17" ry="3.2" fill="#000" opacity=".32"/>';
-    s += '<g class="p-squash"><g class="p-all" filter="url(#smGlow' + key + ')">';
-    /* legs */
-    s += '<g stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round" fill="none">';
-    s += '<line class="p-thighL" x1="60" y1="112" x2="55" y2="135"/><line class="p-shinL" x1="55" y1="135" x2="51" y2="158"/>';
-    s += '<line class="p-thighR" x1="60" y1="112" x2="65" y2="135"/><line class="p-shinR" x1="65" y1="135" x2="69" y2="158"/>';
+    s += '<ellipse class="p-shadow" cx="60" cy="162" rx="15" ry="2.6" fill="#000" opacity=".28"/>';
+    s += '<g class="p-squash"><g class="p-all">';
+    /* legs — open stance so the classic stick figure reads instantly */
+    s += '<g stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round" fill="none">';
+    s += '<line class="p-thighL" x1="60" y1="112" x2="55" y2="135"/><line class="p-shinL" x1="55" y1="135" x2="49" y2="158"/>';
+    s += '<line class="p-thighR" x1="60" y1="112" x2="65" y2="135"/><line class="p-shinR" x1="65" y1="135" x2="71" y2="158"/>';
     s += '</g>';
-    s += '<circle class="p-footL" cx="51" cy="158" r="3.4" fill="' + ink + '"/><circle class="p-footR" cx="69" cy="158" r="3.4" fill="' + ink + '"/>';
+    /* feet are short bars, not blobs */
+    s += '<g stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round" fill="none">';
+    s += '<line class="p-footL" x1="49" y1="158" x2="44" y2="158"/><line class="p-footR" x1="71" y1="158" x2="76" y2="158"/></g>';
     /* torso */
     s += '<line class="p-spine" x1="60" y1="112" x2="60" y2="78" stroke="' + ink + '" stroke-width="' + (w + 1.2) + '" stroke-linecap="round"/>';
-    s += '<circle class="p-hip" cx="60" cy="112" r="3" fill="' + inkDim + '"/>';
-    if (!isV) { /* Nitin tie */
-      s += '<g class="p-tie" stroke="' + acc + '" fill="none" stroke-width="2.6" stroke-linecap="round">';
-      s += '<line class="p-tieLine" x1="60" y1="86" x2="60" y2="98"/><path class="p-tieKnot" d="M60 98 l4.5 6 -4.5 6 -4.5 -6 z" fill="' + acc + '" stroke="none"/></g>';
-    }
     /* arms */
-    s += '<g stroke="' + ink + '" stroke-width="' + (w - 0.6) + '" stroke-linecap="round" fill="none">';
+    s += '<g stroke="' + ink + '" stroke-width="' + (w - 0.5) + '" stroke-linecap="round" stroke-linejoin="round" fill="none">';
     s += '<line class="p-upArmL" x1="60" y1="84" x2="51" y2="97"/><line class="p-foArmL" x1="51" y1="97" x2="43" y2="110"/>';
     s += '<line class="p-upArmR" x1="60" y1="84" x2="69" y2="97"/><line class="p-foArmR" x1="69" y1="97" x2="77" y2="110"/>';
     s += '</g>';
-    s += '<circle class="p-handL" cx="43" cy="110" r="3.2" fill="' + ink + '"/><circle class="p-handR" cx="77" cy="110" r="3.2" fill="' + ink + '"/>';
-    /* head */
+    /* head — clean outlined hoop with a small anchored neck */
     s += '<g class="p-headG">';
-    s += '<circle class="p-head" cx="60" cy="50" r="' + HEAD_R + '" fill="rgba(10,14,28,.55)" stroke="' + ink + '" stroke-width="' + w + '"/>';
-    if (isV) { /* Vinay headband */
-      s += '<g class="p-band"><path class="p-bandArc" d="M47 45 Q60 36 73 45" stroke="' + acc + '" stroke-width="4" fill="none" stroke-linecap="round"/>';
-      s += '<line class="p-bandT1" x1="70" y1="42" x2="78" y2="36" stroke="' + acc + '" stroke-width="2.4" stroke-linecap="round"/>';
-      s += '<line class="p-bandT2" x1="69" y1="45" x2="77" y2="44" stroke="' + acc + '" stroke-width="2.2" stroke-linecap="round"/></g>';
-    } else { /* Nitin glasses */
-      s += '<g class="p-glasses" stroke="' + acc + '" stroke-width="1.8" fill="none">';
-      s += '<circle class="p-glL" cx="55" cy="49" r="4.6"/><circle class="p-glR" cx="65" cy="49" r="4.6"/>';
-      s += '<line class="p-glBridge" x1="59.6" y1="49" x2="60.4" y2="49"/></g>';
+    s += '<line class="p-neck" x1="60" y1="78" x2="60" y2="72" stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round"/>';
+    s += '<circle class="p-head" cx="60" cy="46" r="' + HEAD_R + '" fill="none" stroke="' + ink + '" stroke-width="' + w + '"/>';
+    if (isV) { /* Vinay: plain headband arc — a hair ribbon here reads as a ponytail */
+      s += '<g class="p-band">';
+      s += '<path class="p-bandArc" d="M47 41 Q60 32 73 41" stroke="' + acc + '" stroke-width="3.6" fill="none" stroke-linecap="round"/>';
+      s += '</g>';
+    } else { /* Nitin: round specs */
+      s += '<g class="p-glasses" stroke="' + acc + '" stroke-width="1.9" fill="none">';
+      s += '<circle class="p-glL" cx="55" cy="45" r="4.8"/><circle class="p-glR" cx="65" cy="45" r="4.8"/>';
+      s += '<line class="p-glBridge" x1="59.7" y1="45" x2="60.3" y2="45"/></g>';
     }
-    s += '<ellipse class="p-eyeL" cx="55" cy="49.5" rx="2" ry="2.4" fill="#fff"/>';
-    s += '<ellipse class="p-eyeR" cx="65" cy="49.5" rx="2" ry="2.4" fill="#fff"/>';
-    s += '<circle class="p-pupL" cx="55" cy="49.5" r="1.15" fill="#0b1020"/>';
-    s += '<circle class="p-pupR" cx="65" cy="49.5" r="1.15" fill="#0b1020"/>';
-    s += '<path class="p-mouth" d="M55 57 Q60 60.5 65 57" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" opacity=".92"/>';
-    s += '<ellipse class="p-mouthOpen" cx="60" cy="58.5" rx="2.6" ry="3.2" fill="#3b1020" opacity="0"/>';
+    s += '<ellipse class="p-eyeL" cx="55" cy="45.5" rx="1.9" ry="2.3" fill="#fff"/>';
+    s += '<ellipse class="p-eyeR" cx="65" cy="45.5" rx="1.9" ry="2.3" fill="#fff"/>';
+    s += '<circle class="p-pupL" cx="55" cy="45.5" r="1.1" fill="#0b1020"/>';
+    s += '<circle class="p-pupR" cx="65" cy="45.5" r="1.1" fill="#0b1020"/>';
+    s += '<path class="p-mouth" d="M55 53 Q60 56.5 65 53" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".9"/>';
+    s += '<ellipse class="p-mouthOpen" cx="60" cy="54.5" rx="2.4" ry="3" fill="#3b1020" opacity="0"/>';
     s += '</g>'; /* headG */
     s += '</g></g></svg>';
     return s;
@@ -182,7 +177,7 @@
       thighL: svg.querySelector('.p-thighL'), shinL: svg.querySelector('.p-shinL'),
       thighR: svg.querySelector('.p-thighR'), shinR: svg.querySelector('.p-shinR'),
       footL: svg.querySelector('.p-footL'), footR: svg.querySelector('.p-footR'),
-      spine: svg.querySelector('.p-spine'), hip: svg.querySelector('.p-hip'),
+      spine: svg.querySelector('.p-spine'),
       upArmL: svg.querySelector('.p-upArmL'), foArmL: svg.querySelector('.p-foArmL'),
       upArmR: svg.querySelector('.p-upArmR'), foArmR: svg.querySelector('.p-foArmR'),
       handL: svg.querySelector('.p-handL'), handR: svg.querySelector('.p-handR'),
@@ -190,8 +185,7 @@
       eyeL: svg.querySelector('.p-eyeL'), eyeR: svg.querySelector('.p-eyeR'),
       pupL: svg.querySelector('.p-pupL'), pupR: svg.querySelector('.p-pupR'),
       mouth: svg.querySelector('.p-mouth'), mouthOpen: svg.querySelector('.p-mouthOpen'),
-      bandT1: svg.querySelector('.p-bandT1'), bandT2: svg.querySelector('.p-bandT2'),
-      tieLine: svg.querySelector('.p-tieLine'), tieKnot: svg.querySelector('.p-tieKnot'),
+
       glL: svg.querySelector('.p-glL'), glR: svg.querySelector('.p-glR'), glBridge: svg.querySelector('.p-glBridge')
     };
     bindPointer(F);
@@ -629,57 +623,57 @@
     function setL(el, x1, y1, x2, y2) { el.setAttribute('x1', x1.toFixed(1)); el.setAttribute('y1', y1.toFixed(1)); el.setAttribute('x2', x2.toFixed(1)); el.setAttribute('y2', y2.toFixed(1)); }
     function setC(el, cx, cy) { el.setAttribute('cx', cx.toFixed(1)); el.setAttribute('cy', cy.toFixed(1)); }
 
-    setL(E.thighL, F.hip.x - 2, F.hip.y, kL.jx, kL.jy); setL(E.shinL, kL.jx, kL.jy, kL.bx, kL.by); setC(E.footL, kL.bx, kL.by);
-    setL(E.thighR, F.hip.x + 2, F.hip.y, kR.jx, kR.jy); setL(E.shinR, kR.jx, kR.jy, kR.bx, kR.by); setC(E.footR, kR.bx, kR.by);
-    setL(E.spine, F.hip.x, F.hip.y, F.chest.x, F.chest.y); setC(E.hip, F.hip.x, F.hip.y);
-    setL(E.upArmL, shX - 2, shY, eL.jx, eL.jy); setL(E.foArmL, eL.jx, eL.jy, eL.bx, eL.by); setC(E.handL, eL.bx, eL.by);
-    setL(E.upArmR, shX + 2, shY, eR.jx, eR.jy); setL(E.foArmR, eR.jx, eR.jy, eR.bx, eR.by); setC(E.handR, eR.bx, eR.by);
-
-    /* tie swing */
-    if (E.tieLine) {
-      var tsw = Math.sin(t * 3.2 + F.breath) * 3 + F.lean * 40 + (F.mode === 'walk' ? Math.sin(F.phase) * 2 : 0);
-      setL(E.tieLine, F.chest.x, F.chest.y + 8, F.chest.x + tsw, F.chest.y + 20);
-      E.tieKnot.setAttribute('d', 'M' + (F.chest.x + tsw).toFixed(1) + ' ' + (F.chest.y + 20).toFixed(1) +
-        ' l4.5 6 -4.5 6 -4.5 -6 z');
-    }
+    setL(E.thighL, F.hip.x - 2, F.hip.y, kL.jx, kL.jy); setL(E.shinL, kL.jx, kL.jy, kL.bx, kL.by); setL(E.footL, kL.bx, kL.by, kL.bx - (F.dir > 0 ? 5 : -5), kL.by);
+    setL(E.thighR, F.hip.x + 2, F.hip.y, kR.jx, kR.jy); setL(E.shinR, kR.jx, kR.jy, kR.bx, kR.by); setL(E.footR, kR.bx, kR.by, kR.bx - (F.dir > 0 ? 5 : -5), kR.by);
+    setL(E.spine, F.hip.x, F.hip.y, F.chest.x, F.chest.y);
+    setL(E.upArmL, shX - 2, shY, eL.jx, eL.jy); setL(E.foArmL, eL.jx, eL.jy, eL.bx, eL.by);
+    setL(E.upArmR, shX + 2, shY, eR.jx, eR.jy); setL(E.foArmR, eR.jx, eR.jy, eR.bx, eR.by);
 
     /* head group: position + tilt */
     var tiltDeg = (F.headTilt * 57.3).toFixed(1);
-    E.headG.setAttribute('transform', 'translate(' + (hx.x - HEAD.x).toFixed(1) + ' ' + (hx.y - HEAD.y).toFixed(1) + ') rotate(' + tiltDeg + ' 60 50)');
-    /* headband tails flutter */
-    if (E.bandT1) {
-      var fl1 = Math.sin(t * 9) * 3 - F.vx * 0.004;
-      E.bandT1.setAttribute('x2', (78 + fl1).toFixed(1)); E.bandT1.setAttribute('y2', (36 + Math.cos(t * 7) * 2).toFixed(1));
-      E.bandT2.setAttribute('x2', (77 + fl1 * 0.7).toFixed(1));
-    }
+    E.headG.setAttribute('transform', 'translate(' + (hx.x - HEAD.x).toFixed(1) + ' ' + (hx.y - HEAD.y).toFixed(1) + ') rotate(' + tiltDeg + ' 60 46)');
+    /* headband flutter intentionally removed — the trailing lines read
+       as a ponytail, which makes the mascot look feminine */
     /* eyes: blink + pupils track gaze */
-    var eyeRy = blinking ? 0.25 : 2.4;
+    var eyeRy = blinking ? 0.25 : 2.3;
     E.eyeL.setAttribute('ry', eyeRy.toFixed(2)); E.eyeR.setAttribute('ry', eyeRy.toFixed(2));
     var px = F.gaze.x * 1.1, py = F.gaze.y * 1.2;
-    E.pupL.setAttribute('cx', (55 + px).toFixed(1)); E.pupL.setAttribute('cy', (49.5 + py).toFixed(1));
-    E.pupR.setAttribute('cx', (65 + px).toFixed(1)); E.pupR.setAttribute('cy', (49.5 + py).toFixed(1));
+    E.pupL.setAttribute('cx', (55 + px).toFixed(1)); E.pupL.setAttribute('cy', (45.5 + py).toFixed(1));
+    E.pupR.setAttribute('cx', (65 + px).toFixed(1)); E.pupR.setAttribute('cy', (45.5 + py).toFixed(1));
     E.pupL.setAttribute('opacity', blinking ? 0 : 1); E.pupR.setAttribute('opacity', blinking ? 0 : 1);
     /* mouth: smile <-> frown morph + open (surprise/yawn) */
     var sm = clamp(F.smile, -1, 1);
-    E.mouth.setAttribute('d', 'M55 57 Q60 ' + (57 + sm * 4.2).toFixed(1) + ' 65 57');
-    E.mouth.setAttribute('opacity', (0.92 * (1 - F.mouthOpen)).toFixed(2));
+    E.mouth.setAttribute('d', 'M55 53 Q60 ' + (53 + sm * 4.2).toFixed(1) + ' 65 53');
+    E.mouth.setAttribute('opacity', (0.9 * (1 - F.mouthOpen)).toFixed(2));
     E.mouthOpen.setAttribute('opacity', (F.mouthOpen * 0.95).toFixed(2));
-    E.mouthOpen.setAttribute('ry', (1.5 + F.mouthOpen * 2.4).toFixed(2));
+    E.mouthOpen.setAttribute('cy', (54.5).toFixed(1));
+    E.mouthOpen.setAttribute('ry', (1.4 + F.mouthOpen * 2.4).toFixed(2));
 
     /* squash & stretch around feet */
     E.squash.setAttribute('transform', 'translate(60 158) scale(' + F.squashX.toFixed(3) + ' ' + F.squashY.toFixed(3) + ') translate(-60 -158)');
     /* shadow */
     var airH = clamp(Math.abs(F.yOff) / 60, 0, 1);
-    E.shadow.setAttribute('opacity', (0.32 * (1 - airH * 0.6)).toFixed(2));
-    E.shadow.setAttribute('rx', (17 * (1 - airH * 0.3)).toFixed(1));
+    E.shadow.setAttribute('opacity', (0.28 * (1 - airH * 0.6)).toFixed(2));
+    E.shadow.setAttribute('rx', (15 * (1 - airH * 0.3)).toFixed(1));
 
     /* world position */
     F.el.style.transform = 'translate3d(' + F.x.toFixed(1) + 'px,' + (F.y + F.yOff).toFixed(1) + 'px,0)';
   }
 
+  var lastFrameAt = 0;
   function frame(now) {
     rafId = requestAnimationFrame(frame);
+    /* On phones/weak devices the mascots do not need 60fps to look
+       alive. Halving the cadence there is the single biggest win for
+       keeping the rest of the page responsive while they animate. */
+    var lite = window.AiaPerf && window.AiaPerf.lite;
+    var busy = (figures.vinay && figures.vinay.mode !== 'idle') ||
+               (figures.nitin && figures.nitin.mode !== 'idle');
+    var cap = (lite && !busy) ? 30 : 0;
+    if (cap && now - lastFrameAt < 1000 / cap - 1.5) return;
+    lastFrameAt = now;
     var dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
+    if (lite) dt = Math.min(dt, 0.05);
     lastT = now;
     var t = now / 1000;
     if (figures.vinay) updateFigure(figures.vinay, now, dt, t);

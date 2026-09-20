@@ -1734,6 +1734,59 @@ h1, h2, h3, h4 { line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
 }
 .chat-send-btn:hover { transform: scale(1.08); box-shadow: 0 8px 28px rgba(79,140,255,.55); }
 .chat-send-btn:active { transform: scale(.94); }
+.chat-attach-btn {
+  flex: 0 0 auto;
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform .2s, color .2s, border-color .2s;
+}
+.chat-attach-btn:hover { color: var(--gold); border-color: var(--gold); transform: translateY(-1px); }
+.chat-attach-btn:active { transform: scale(.94); }
+
+/* attachments inside a message bubble */
+.chat-attach {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: rgba(255,255,255,.04);
+  text-decoration: none;
+  color: inherit;
+  max-width: 100%;
+  transition: border-color .2s, background .2s, transform .2s;
+}
+.chat-attach:hover { border-color: var(--gold); background: rgba(255,255,255,.07); transform: translateY(-1px); }
+.chat-attach-icon {
+  flex: 0 0 auto;
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--grad-primary);
+  color: #fff;
+  font-size: 1rem;
+}
+.chat-attach-meta { display: flex; flex-direction: column; min-width: 0; }
+.chat-attach-meta strong { font-size: .85rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-attach-meta small { font-size: .72rem; color: var(--text-muted); }
+.chat-attach-img { padding: 0; border: none; background: none; display: block; }
+.chat-attach-img img {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+}
 .suggested-chips {
   display: flex;
   gap: 9px;
@@ -2467,6 +2520,12 @@ h1, h2, h3, h4 { line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
 .login-overlay.done { opacity: 0; transform: scale(1.06); pointer-events: none; }
 .login-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .login-aurora { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+/* Clip the decorative blobs to the viewport. They are positioned with
+   negative offsets on purpose, which otherwise widens the overlay's
+   scrollWidth and lets short phones pan sideways. The gradients fade to
+   transparent well before their box edge, so clipping introduces no
+   visible seam. */
+.login-aurora, .login-overlay .blob-wrap { overflow: hidden; }
 .login-aurora .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; animation: blobFloat 16s ease-in-out infinite alternate; }
 .login-aurora .blob-1 { width: 420px; height: 420px; left: -8%; top: -12%; background: radial-gradient(circle, rgba(124,108,255,.55), transparent 65%); }
 .login-aurora .blob-2 { width: 380px; height: 380px; right: -6%; bottom: -10%; background: radial-gradient(circle, rgba(245,181,68,.4), transparent 65%); animation-delay: -6s; }
@@ -2532,7 +2591,7 @@ h1, h2, h3, h4 { line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
 }
 .login-field:focus-within { border-color: rgba(124,108,255,.75); box-shadow: 0 0 0 3px rgba(124,108,255,.16); }
 .login-field i { color: var(--gold); width: 18px; text-align: center; }
-.login-field input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font-size: .95rem; }
+.login-field input { flex: 1 1 0; min-width: 0; width: 100%; background: transparent; border: 0; outline: 0; color: var(--text); font-size: .95rem; }
 .login-btn {
   width: 100%; padding: 14px; margin-top: 6px;
   border: 0; border-radius: 14px; cursor: pointer;

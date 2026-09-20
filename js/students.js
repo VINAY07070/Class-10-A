@@ -1,1 +1,1 @@
-document.write('<script src="../students.js"><\/script>');
+document.write('<script src="students.js"><\/script>');

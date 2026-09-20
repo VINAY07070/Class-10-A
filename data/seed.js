@@ -1,1 +1,1 @@
-document.write('<script src="../seed.js"><\/script>');
+document.write('<script src="seed.js"><\/script>');

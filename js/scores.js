@@ -1,1 +1,1 @@
-document.write('<script src="../scores.js"><\/script>');
+document.write('<script src="scores.js"><\/script>');

@@ -1,0 +1,207 @@
+/* ============================================================
+   PERF.CSS — smoothness layer (phones first)
+   ------------------------------------------------------------
+   The visual flourish that made this site laggy on phones was
+   not any single animation; it was stacking 40+ backdrop-filter
+   blurs on top of 50+ always-on animations. Every one of those
+   forces the compositor to re-sample the whole backdrop whenever
+   anything beneath them moves.
+
+   Strategy:
+   1. `.perf-lite` (added by perf.js on phones / weak devices)
+      swaps expensive blur for flat translucent panels, so the
+      look is preserved but painting is cheap.
+   2. Off-screen sections skip layout/paint entirely.
+   3. Animations only run while their element is on screen.
+   ============================================================ */
+
+/* ---------- 1. off-screen sections cost nothing ---------- */
+/* Only large page blocks — applying this to grid cards causes layout
+   jumps while scrolling, which reads as jank rather than fixing it. */
+.section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 640px;
+}
+.section.hero, .section.no-contain { content-visibility: visible; }
+
+/* ---------- 2. pause animations when off screen ---------- */
+@supports (animation-timeline: view()) {
+  /* modern engines can skip work for fully off-screen animation hosts */
+  .hero-aurora .blob,
+  .login-gate .gate-orb,
+  .bg-blob {
+    animation-play-state: running;
+  }
+}
+
+/* ---------- 3. perf-lite: flat panels instead of live blur ---------- */
+.perf-lite * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* keep the frosted look with a solid equivalent so nothing goes transparent */
+.perf-lite .navbar,
+.perf-lite .navbar-inner,
+.perf-lite .mobile-drawer,
+.perf-lite .bottom-nav,
+.perf-lite .tabbar,
+.perf-lite .toast,
+.perf-lite .modal,
+.perf-lite .modal-content,
+.perf-lite .dialog,
+.perf-lite .sm-tag,
+.perf-lite .sm-bubble,
+.perf-lite .chat-input-area,
+.perf-lite .login-card,
+.perf-lite .glass-card,
+.perf-lite .info-card,
+.perf-lite .empty-state,
+.perf-lite .analytics-card,
+.perf-lite .stat-card,
+.perf-lite .chat-container,
+.perf-lite .chat-header,
+.perf-lite .chat-app {
+  background-color: rgba(12, 17, 34, .96) !important;
+}
+
+.perf-lite .login-gate {
+  background-color: rgba(5, 8, 18, .985) !important;
+}
+
+/* ---------- 4. perf-lite: tame always-on motion ---------- */
+.perf-lite .hero-aurora .blob,
+.perf-lite .login-gate .gate-orb,
+.perf-lite .bg-blob {
+  filter: none !important;
+  animation: none !important;
+  opacity: .28 !important;
+}
+
+/* sparkle/float loops are pretty on a desk, janky in a pocket */
+.perf-lite .scroll-indicator,
+.perf-lite .scroll-wheel,
+.perf-lite .hero-float,
+.perf-lite .hero-shine,
+.perf-lite .sparkle,
+.perf-lite .heartbeat .heart-pulse {
+  animation: none !important;
+}
+
+/* keep the friendly wobble, drop the continuous ones */
+.perf-lite .empty-icon,
+.perf-lite .maker,
+.perf-lite .maker-nitin,
+.perf-lite .thumbs,
+.perf-lite .stat-icon,
+.perf-lite .badge-pulse {
+  animation: none !important;
+}
+
+/* hover-only flourishes never fire on touch anyway */
+.perf-lite .sun-rays,
+.perf-lite .hero-shine { display: none; }
+
+/* ---------- 5. perf-lite: cheaper shadows ---------- */
+.perf-lite .glass-card,
+.perf-lite .feature-card,
+.perf-lite .subject-card,
+.perf-lite .teacher-card,
+.perf-lite .student-card,
+.perf-lite .announcement-card,
+.perf-lite .poll-card,
+.perf-lite .stat-card {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .32) !important;
+}
+
+/* ============================================================
+   LOGIN MASCOTS — the class stickmen welcome you at the gate
+   ============================================================ */
+.login-mascots {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  height: 92px;
+}
+.login-mascot {
+  width: 62px;
+  transform-origin: bottom center;
+  animation: lmBob 3.4s ease-in-out infinite;
+}
+.login-mascot.garland { animation-delay: -1.7s; }
+.login-mascot:nth-child(2) { animation-duration: 3.9s; }
+.login-mascot .lm-svg { display: block; width: 100%; height: auto; }
+
+/* arm wave — rotate around the shoulder, GPU-only properties */
+.login-mascot .lm-armR {
+  transform-box: fill-box;
+  transform-origin: 0% 0%;
+  animation: lmWave 2.6s ease-in-out infinite;
+}
+.login-mascot.garland .lm-armR { animation-duration: 3.1s; animation-delay: -0.8s; }
+
+@keyframes lmBob {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(-6px) rotate(1.5deg); }
+}
+@keyframes lmWave {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  62% { transform: rotate(-38deg); }
+  70% { transform: rotate(-6deg); }
+  78% { transform: rotate(-34deg); }
+  86% { transform: rotate(-2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-mascot, .login-mascot .lm-armR { animation: none !important; }
+}
+@media (max-width: 400px) {
+  .login-mascots { height: 78px; }
+  .login-mascot { width: 54px; }
+}
+
+/* ------------------------------------------------------------
+   Short phones (e.g. 360x640, 320x568): the gate panel is taller
+   than the viewport, so let it scroll instead of clipping the
+   buttons off the bottom.
+   ------------------------------------------------------------ */
+@media (max-height: 780px) {
+  .login-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
+    overflow-x: hidden;   /* aurora blobs intentionally bleed past the edges */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: calc(14px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom));
+  }
+  .login-stage { margin: auto; }
+  .login-brand { margin-bottom: 14px; }
+  .login-logo { width: 58px; height: 58px; border-radius: 18px; margin-bottom: 10px; }
+  .login-school { font-size: .68rem; letter-spacing: .24em; }
+  .login-class { font-size: clamp(1.35rem, 6.2vw, 1.8rem); }
+  .login-sub { font-size: .8rem; margin-top: 5px; }
+  .login-mascots { height: 68px; margin-bottom: 10px; }
+  .login-mascot { width: 50px; }
+  .login-body { padding: 18px 20px; }
+  .login-field input { padding: 12px 14px; }
+  .login-btn { padding: 13px 18px; }
+  .login-foot { margin-top: 12px; gap: 8px; }
+  .login-foot-item { font-size: .68rem; }
+  .login-scrollhint { display: none; }
+}
+
+/* ---------- 6. reduce-motion parity ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .hero-aurora .blob,
+  .login-gate .gate-orb,
+  .bg-blob { animation: none !important; }
+}
+
+/* ---------- 7. print / low-power fallback ---------- */
+@media (prefers-reduced-transparency: reduce) {
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}

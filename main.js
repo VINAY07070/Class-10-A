@@ -401,11 +401,13 @@ var App = (function () {
     var ctx = canvas.getContext('2d');
     if (!ctx) return;
     var w, h, particles = [], raf = 0, running = true;
-    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var smallScreen = Math.min(window.innerWidth, window.innerHeight) < 700;
+    var perf = window.AiaPerf || {};
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches || perf.reduced;
+    var smallScreen = perf.smallScreen != null ? perf.smallScreen : Math.min(window.innerWidth, window.innerHeight) < 700;
+    var lowPower = !!perf.lowPower;
     var mouse = { x: -9999, y: -9999 };
     var PALETTE = ['124,108,255', '56,224,255', '79,140,255', '245,181,68', '255,110,199'];
-    var DPR = Math.min(window.devicePixelRatio || 1, smallScreen ? 1.5 : 2);
+    var DPR = Math.min(window.devicePixelRatio || 1, lowPower ? 1 : (smallScreen ? 1.5 : 2));
 
     function resize() {
       w = canvas.offsetWidth; h = canvas.offsetHeight;
@@ -416,8 +418,8 @@ var App = (function () {
     resize();
     window.addEventListener('resize', resize);
 
-    var density = smallScreen ? 26000 : 13000;
-    var count = reduced ? 14 : Math.min(smallScreen ? 42 : 85, Math.floor(w * h / density));
+    var density = lowPower ? 42000 : (smallScreen ? 26000 : 13000);
+    var count = reduced ? 14 : Math.min(lowPower ? 26 : (smallScreen ? 42 : 85), Math.floor(w * h / density));
     for (var i = 0; i < count; i++) {
       particles.push({
         x: Math.random() * w,
@@ -462,7 +464,7 @@ var App = (function () {
       raf = requestAnimationFrame(draw);
       ctx.clearRect(0, 0, w, h);
       /* faint constellation links (desktop only, cheap: capped pairs) */
-      if (!smallScreen && !reduced) {
+      if (!smallScreen && !lowPower && !reduced) {
         ctx.lineWidth = 1;
         var linked = 0;
         for (var i = 0; i < particles.length && linked < 60; i++) {
@@ -478,7 +480,12 @@ var App = (function () {
           }
         }
       }
-      particles.forEach(function (p) {
+      /* Batch by colour: one arc() per particle but only a handful of
+         fill() calls, instead of a state change + fill per particle.
+         On a phone that is the difference between smooth and stuttery. */
+      var buckets = {}, order = [];
+      for (var k = 0; k < particles.length; k++) {
+        var p = particles[k];
         var dxm = p.x - mouse.x, dym = p.y - mouse.y;
         var dm2 = dxm * dxm + dym * dym;
         if (dm2 < 13000 && dm2 > 0.01) {
@@ -489,12 +496,26 @@ var App = (function () {
         p.x += p.dx; p.y += p.dy;
         if (p.x < -8) p.x = w + 8; else if (p.x > w + 8) p.x = -8;
         if (p.y < -8) p.y = h + 8; else if (p.y > h + 8) p.y = -8;
-        var tw = p.alpha * (0.55 + 0.45 * Math.sin(t / 900 * p.twinkle + p.phase));
+        var tw = lowPower ? p.alpha
+          : p.alpha * (0.55 + 0.45 * Math.sin(t / 900 * p.twinkle + p.phase));
+        /* quantise alpha so particles share buckets and we batch fills */
+        var q = Math.round(Math.max(0.05, tw) * 8) / 8;
+        var key = p.hue + '|' + q;
+        if (!buckets[key]) { buckets[key] = []; order.push(key); }
+        buckets[key].push(p);
+      }
+      for (var o = 0; o < order.length; o++) {
+        var parts = buckets[order[o]];
+        var sep = order[o].split('|');
+        ctx.fillStyle = 'rgba(' + sep[0] + ',' + sep[1] + ')';
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(' + p.hue + ',' + Math.max(0.05, tw) + ')';
+        for (var n = 0; n < parts.length; n++) {
+          var pt = parts[n];
+          ctx.moveTo(pt.x + pt.r, pt.y);
+          ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+        }
         ctx.fill();
-      });
+      }
     }
     raf = requestAnimationFrame(draw);
   }

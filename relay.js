@@ -46,7 +46,7 @@
     aia_polls: 'pl', aia_student_profiles: 'sp', aia_subject_content: 'sc',
     aia_subject_photos: 'ph', aia_ai_config: 'ac', aia_theme: 'th',
     aia_presence: 'pr', aia_ai_log: 'ag', aia_chat_mode: 'cm2',
-    aia_credentials_overrides: 'co'
+    aia_files: 'fl', aia_credentials_overrides: 'co'
   };
   var LONG = {};
   Object.keys(SHORT).forEach(function (k) { LONG[SHORT[k]] = k; });
@@ -186,7 +186,10 @@
     Object.keys(msg.d).forEach(function (sk) {
       var full = longKey(sk);
       if (!full) return;
-      try { data[full] = JSON.parse(msg.d[sk]); } catch (e) {}
+      /* Values are normally JSON, but a few settings (e.g. the theme) are
+         stored as plain strings — pass those through untouched. */
+      try { data[full] = JSON.parse(msg.d[sk]); }
+      catch (e) { data[full] = msg.d[sk]; }
     });
     if (!Object.keys(data).length) return;
     try {
@@ -238,10 +241,15 @@
     es.onmessage = function (ev) { handleNtfyEvent(ev); };
     es.onerror = function () {
       closeStream();
+      sseFails++;
       setStatus('error', 'Live link dropped — catching up');
-      setPolling(5000);                   /* fall back to polling */
+      /* Exponential backoff: the free public relay rate-limits aggressive
+         reconnects (HTTP 429), and hammering it makes recovery slower, not
+         faster. Reset happens on a successful open. */
+      var wait = Math.min(4000 * Math.pow(1.7, Math.min(sseFails - 1, 5)), 90000);
+      setPolling(Math.min(5000 * sseFails, 60000));
       clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(connect, 4000);
+      reconnectTimer = setTimeout(connect, wait);
     };
   }
   function closeStream() { try { if (es) es.close(); } catch (e) {} es = null; }

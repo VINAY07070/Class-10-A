@@ -20,6 +20,8 @@
   var messagesEl = document.getElementById('chatMessages');
   var inputEl = document.getElementById('chatInput');
   var sendBtn = document.getElementById('chatSendBtn');
+  var attachBtn = document.getElementById('chatAttachBtn');
+  var fileInput = document.getElementById('chatFileInput');
   var clearBtn = document.getElementById('clearMyChatBtn');
   var logoutBtn = document.getElementById('chatLogoutBtn');
   var adminToggle = document.getElementById('adminViewToggle');
@@ -133,7 +135,7 @@
         (isAdmin && m.username ? '<span class="chat-msg-user">@' + esc(m.username) + '</span>' : '') +
         '<span class="chat-msg-time">' + App.timeAgo(m.at) + '</span>' +
         (canDel ? '<button class="chat-del" data-id="' + esc(m.id || '') + '" title="Delete">✕</button>' : '') +
-        '</div><div class="chat-msg-body">' + esc(m.content) + '</div>';
+        '</div><div class="chat-msg-body">' + esc(m.content) + (m.file ? fileBlockHtml(m.file) : '') + '</div>';
       messagesEl.appendChild(wrap);
     });
     messagesEl.querySelectorAll('.chat-del').forEach(function (btn) {
@@ -142,6 +144,40 @@
       });
     });
     messagesEl.scrollTop = wasBottom ? messagesEl.scrollHeight : Math.min(prevTop, messagesEl.scrollHeight);
+  }
+
+  /* ---------- attachments ---------- */
+  function fileBlockHtml(f) {
+    if (!f || !f.url) return '';
+    var safeUrl = esc(f.url);
+    var name = esc(f.name || 'file');
+    var size = window.AiaFiles ? window.AiaFiles.pretty(f.size || 0) : '';
+    if (f.kind === 'image') {
+      return '<a class="chat-attach chat-attach-img" href="' + safeUrl + '" target="_blank" rel="noopener">' +
+        '<img src="' + safeUrl + '" alt="' + name + '" loading="lazy"></a>';
+    }
+    var icon = f.kind === 'pdf' ? 'fa-file-pdf' : (f.kind === 'audio' ? 'fa-file-audio' : (f.kind === 'video' ? 'fa-file-video' : 'fa-file'));
+    return '<a class="chat-attach" href="' + safeUrl + '" target="_blank" rel="noopener" download="' + name + '">' +
+      '<span class="chat-attach-icon"><i class="fa-solid ' + icon + '"></i></span>' +
+      '<span class="chat-attach-meta"><strong>' + name + '</strong><small>' + size + ' · tap to download</small></span></a>';
+  }
+
+  function sendFiles(files) {
+    if (!session || !window.AiaFiles || !files || !files.length) return;
+    App.showToast('Uploading ' + files.length + ' file' + (files.length > 1 ? 's' : '') + '…', 'info');
+    window.AiaFiles.uploadAll(files, { by: session.name }, function (res) {
+      if (!res.ok) { App.showToast(res.error || 'Upload failed', 'error'); return; }
+      window.AiaFiles.share(res.file);
+      DataStore.addClassChat({
+        name: session.name,
+        username: session.username,
+        content: res.file.note || '📎 ' + res.file.name,
+        file: res.file,
+        at: new Date().toISOString()
+      });
+      App.showToast('Shared ' + res.file.name, 'success');
+      renderMessages(true);
+    });
   }
   function nearBottom() {
     return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
@@ -162,7 +198,8 @@
   /* ---------- send ---------- */
   function send() {
     var text = inputEl.value.trim();
-    if (!text || !session) return;
+    if (!session) return;
+    if (!text) return;
     if (text.length > 500) { App.showToast('Message too long (max 500)', 'error'); return; }
     DataStore.addClassChat({
       name: session.name,
@@ -234,6 +271,14 @@
   if (passInput) passInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') tryLogin(); });
   if (userInput) userInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') passInput.focus(); });
   if (sendBtn) sendBtn.addEventListener('click', send);
+  if (attachBtn && fileInput) {
+    attachBtn.addEventListener('click', function () { fileInput.click(); });
+    fileInput.addEventListener('change', function (e) {
+      var files = Array.from(e.target.files || []);
+      if (files.length) sendFiles(files);
+      e.target.value = '';
+    });
+  }
   if (inputEl) {
     inputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
     inputEl.addEventListener('input', broadcastTyping);

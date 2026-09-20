@@ -38,6 +38,11 @@
     if (visitor ? !input.pass : (!input.username || !input.password)) { showError('Enter the required details.'); return; }
     var button = form.querySelector('button[type="submit"]');
     if (button) button.disabled = true;
+    /* The optional server login only exists over http(s); on file:// (or when
+       opened without a backend) go straight to the local credential check so we
+       don't log a spurious network error. */
+    var canUseServer = location.protocol === 'http:' || location.protocol === 'https:';
+    if (!canUseServer) { localLogin(input, visitor); if (button) button.disabled = false; return; }
     fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(input) })
       .then(function (r) { if (!r.ok) throw new Error('login'); return r.json(); })
       .then(finish)
