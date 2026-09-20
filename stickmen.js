@@ -80,6 +80,9 @@
   var timers = [];
   var pointer = { x: -9999, y: -9999, active: false };
   var BUBBLE_CD = 22000, HF_CD = 60000, WAVE_CD = 18000;
+  /* Wall-climb descent speed, px/s. Slow enough to read as deliberate
+     climbing rather than sliding. */
+  var C_SPEED = 52;
   var lastHighFive = -HF_CD, lastAmbient = 0;
   var floorPad = 10, figW = 88;            // set by measure()
   var MIN_X = 40, MAX_X = 300;
@@ -97,40 +100,36 @@
     s += '<svg class="sm-svg" viewBox="0 0 120 172" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
     s += '<ellipse class="p-shadow" cx="60" cy="162" rx="15" ry="2.6" fill="#000" opacity=".28"/>';
     s += '<g class="p-squash"><g class="p-all">';
-    /* legs — open stance so the classic stick figure reads instantly */
+    /* Legs: two straight lines, hip -> knee -> foot, opened into a
+       natural stance. The rest pose has always been overridden by the
+       IK solver in renderFigure(); the angles here only need to be a
+       sane fallback for the very first paint (before any frame runs).
+       A classic stick figure stands on straight legs, so the rest pose
+       is deliberately near-vertical rather than bowed. */
     s += '<g stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round" fill="none">';
-    s += '<line class="p-thighL" x1="60" y1="112" x2="55" y2="135"/><line class="p-shinL" x1="55" y1="135" x2="49" y2="158"/>';
-    s += '<line class="p-thighR" x1="60" y1="112" x2="65" y2="135"/><line class="p-shinR" x1="65" y1="135" x2="71" y2="158"/>';
+    s += '<line class="p-thighL" x1="58" y1="112" x2="55" y2="135"/><line class="p-shinL" x1="55" y1="135" x2="53" y2="158"/>';
+    s += '<line class="p-thighR" x1="62" y1="112" x2="65" y2="135"/><line class="p-shinR" x1="65" y1="135" x2="67" y2="158"/>';
     s += '</g>';
     /* feet are short bars, not blobs */
     s += '<g stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round" fill="none">';
-    s += '<line class="p-footL" x1="49" y1="158" x2="44" y2="158"/><line class="p-footR" x1="71" y1="158" x2="76" y2="158"/></g>';
-    /* torso */
+    s += '<line class="p-footL" x1="53" y1="158" x2="48" y2="158"/><line class="p-footR" x1="67" y1="158" x2="72" y2="158"/></g>';
+    /* torso — a single clean spine line, classic stick figure proportions */
     s += '<line class="p-spine" x1="60" y1="112" x2="60" y2="78" stroke="' + ink + '" stroke-width="' + (w + 1.2) + '" stroke-linecap="round"/>';
-    /* arms */
+    /* arms: straight lines, shoulder -> elbow -> hand */
     s += '<g stroke="' + ink + '" stroke-width="' + (w - 0.5) + '" stroke-linecap="round" stroke-linejoin="round" fill="none">';
     s += '<line class="p-upArmL" x1="60" y1="84" x2="51" y2="97"/><line class="p-foArmL" x1="51" y1="97" x2="43" y2="110"/>';
     s += '<line class="p-upArmR" x1="60" y1="84" x2="69" y2="97"/><line class="p-foArmR" x1="69" y1="97" x2="77" y2="110"/>';
     s += '</g>';
-    /* head — clean outlined hoop with a small anchored neck */
-    s += '<g class="p-headG">';
+    /* head — a plain circle. No hair ribbon, no headband, no glasses:
+       those details read as a character with a hairstyle rather than a
+       universal "stickman", which is what the class asked us to fix. */
     s += '<line class="p-neck" x1="60" y1="78" x2="60" y2="72" stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round"/>';
+    s += '<g class="p-headG">';
     s += '<circle class="p-head" cx="60" cy="46" r="' + HEAD_R + '" fill="none" stroke="' + ink + '" stroke-width="' + w + '"/>';
-    if (isV) { /* Vinay: plain headband arc — a hair ribbon here reads as a ponytail */
-      s += '<g class="p-band">';
-      s += '<path class="p-bandArc" d="M47 41 Q60 32 73 41" stroke="' + acc + '" stroke-width="3.6" fill="none" stroke-linecap="round"/>';
-      s += '</g>';
-    } else { /* Nitin: round specs */
-      s += '<g class="p-glasses" stroke="' + acc + '" stroke-width="1.9" fill="none">';
-      s += '<circle class="p-glL" cx="55" cy="45" r="4.8"/><circle class="p-glR" cx="65" cy="45" r="4.8"/>';
-      s += '<line class="p-glBridge" x1="59.7" y1="45" x2="60.3" y2="45"/></g>';
-    }
-    s += '<ellipse class="p-eyeL" cx="55" cy="45.5" rx="1.9" ry="2.3" fill="#fff"/>';
-    s += '<ellipse class="p-eyeR" cx="65" cy="45.5" rx="1.9" ry="2.3" fill="#fff"/>';
-    s += '<circle class="p-pupL" cx="55" cy="45.5" r="1.1" fill="#0b1020"/>';
-    s += '<circle class="p-pupR" cx="65" cy="45.5" r="1.1" fill="#0b1020"/>';
-    s += '<path class="p-mouth" d="M55 53 Q60 56.5 65 53" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".9"/>';
-    s += '<ellipse class="p-mouthOpen" cx="60" cy="54.5" rx="2.4" ry="3" fill="#3b1020" opacity="0"/>';
+    s += '<circle class="p-pupL" cx="55" cy="45.5" r="1.5" fill="' + ink + '"/>';
+    s += '<circle class="p-pupR" cx="65" cy="45.5" r="1.5" fill="' + ink + '"/>';
+    s += '<path class="p-mouth" d="M55 53 Q60 56.5 65 53" stroke="' + ink + '" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".85"/>';
+    s += '<ellipse class="p-mouthOpen" cx="60" cy="54.5" rx="2.4" ry="3" fill="' + ink + '" opacity="0"/>';
     s += '</g>'; /* headG */
     s += '</g></g></svg>';
     return s;
@@ -170,7 +169,13 @@
       dragging: false, px: 0, py: 0, lastPX: 0, lastPY: 0, air: 0,
       dangle: { aL: 0, aR: 0, vL: 0, vR: 0, lL: 0, lR: 0, uL: 0, uR: 0 },
       dizzy: 0, lastBubble: -BUBBLE_CD, lastWave: -WAVE_CD, noticedWave: 0,
-      stepSide: 1, wasAir: false
+      stepSide: 1, wasAir: false,
+      /* wall climb: stick figures slide down the screen edges by alternately
+         gripping with one limb pair while the other pair reaches for the
+         next hold. Nothing else on the page does this, so they read as
+         alive rather than as decorations sliding on rails. */
+      climb: { side: 0, limb: 0, timer: 0, vy: 0, progress: 0, facing: 1 },
+      climbCd: performance.now() + rand(14000, 32000)
     };
     F.elP = {
       shadow: svg.querySelector('.p-shadow'), squash: svg.querySelector('.p-squash'),
@@ -182,11 +187,9 @@
       upArmR: svg.querySelector('.p-upArmR'), foArmR: svg.querySelector('.p-foArmR'),
       handL: svg.querySelector('.p-handL'), handR: svg.querySelector('.p-handR'),
       headG: svg.querySelector('.p-headG'), head: svg.querySelector('.p-head'),
-      eyeL: svg.querySelector('.p-eyeL'), eyeR: svg.querySelector('.p-eyeR'),
+      neck: svg.querySelector('.p-neck'),
       pupL: svg.querySelector('.p-pupL'), pupR: svg.querySelector('.p-pupR'),
-      mouth: svg.querySelector('.p-mouth'), mouthOpen: svg.querySelector('.p-mouthOpen'),
-
-      glL: svg.querySelector('.p-glL'), glR: svg.querySelector('.p-glR'), glBridge: svg.querySelector('.p-glBridge')
+      mouth: svg.querySelector('.p-mouth'), mouthOpen: svg.querySelector('.p-mouthOpen')
     };
     bindPointer(F);
     return F;
@@ -298,6 +301,42 @@
     doJump(F, 60, function () { later(function () { doJump(F, 44); }, 120); });
     if (canBubble(F)) say(F, pick(['Yay!', 'Woohoo!', '10-A rocks!', 'Amazing!']), 1800);
   }
+
+  /* ---------------- wall climb ----------------
+     The figure walks to a screen edge, turns to face the wall, then
+     descends it hand over hand. Grip and reach alternate, so the limbs
+     never move as one rigid pair. */
+  function startClimb(F) {
+    if (!F || REDUCED || F.dragging || F.mode !== 'idle') return false;
+    /* pick the nearer edge, so the trip looks purposeful */
+    var W = window.innerWidth;
+    F.climb.side = (F.x < W / 2) ? -1 : 1;
+    F.climb.limb = 0;
+    F.climb.timer = 0;
+    F.climb.progress = 0;
+    F.climb.vy = 0;
+    F.climb.facing = F.climb.side;
+    walkTo(F.key, F.climb.side < 0 ? MIN_X : MAX_X, function () {
+      if (hidden || REDUCED) return;
+      /* Climb UP the edge first: yOff is the offset from the standing
+         position, so a large negative yOff puts them near the top of the
+         viewport. They then descend back to yOff 0 (the ground). */
+      F.mode = 'climb';
+      F.t0 = performance.now();
+      F.yOff = -(F.y - 36);
+      F.climb.timer = 0;
+      F.climb.phase = 0;
+      F.smileT = 0.85;
+      F.mouthOpenT = 0.25;
+    });
+    return true;
+  }
+  function canClimb(F) {
+    return F && F.mode === 'idle' && !F.dragging && !REDUCED &&
+           performance.now() > F.climbCd;
+  }
+
+  /* ---------------- fall & dizzy recovery ---------------- */
   function maybeHighFive() {
     if (REDUCED || hidden || document.hidden) return;
     var now = performance.now();
@@ -319,18 +358,101 @@
     });
   }
 
-  /* click / tap reaction */
+  /* click / tap reaction.
+     A repeated tap should not repeat the same move — it makes the mascot
+     look mechanical. `nextReaction` rotates through a small repertoire and
+     remembers what was used last, so consecutive taps always look different. */
+  var REACTIONS = ['wave', 'jump', 'point', 'nod', 'shrug'];
+  var lastReaction = 0;
+  function pickReaction() {
+    var i = (lastReaction + 1 + ((Math.random() * (REACTIONS.length - 1)) | 0)) % REACTIONS.length;
+    lastReaction = i;
+    return REACTIONS[i];
+  }
   function react(F) {
     if (!F || hidden) return;
     if (F.dragging) return;
     F.smileT = 1;
     later(function () { if (F.mode === 'idle') F.smileT = 0.7; }, 2500);
     if (!REDUCED && F.mode === 'idle') {
-      if (Math.random() < 0.55) { doWave(F, 1600); burst(F, 5, 'spark'); }
-      else doJump(F, 40);
+      switch (pickReaction()) {
+        case 'wave': burst(F, 5, 'spark'); doWave(F, 1600); break;
+        case 'jump': doJump(F, 40); break;
+        case 'point': doPoint(F, 1500); break;
+        case 'nod': doNod(F, 1200); break;
+        default: doShrug(F, 1400); break;
+      }
     }
     if (canBubble(F)) say(F, pick(siteLines()), 2600);
     else burst(F, 3, 'hearts');
+  }
+
+  /* ---------------- interaction set ----------------
+     Short, purposeful gestures. Each is a timed mode handled in renderFigure,
+     so they compose with the normal idle breathing instead of fighting it. */
+  function gesture(F, mode, dur, opts) {
+    if (!F || F.dragging || REDUCED) return false;
+    if (F.mode !== 'idle') return false;
+    F.mode = mode; F.t0 = performance.now(); F.dur = dur || 1200;
+    F.onDone = null;
+    F.gesture = opts || null;
+    return true;
+  }
+  function doPoint(F, ms) { if (gesture(F, 'point', ms)) { F.smileT = 1; F.mouthOpenT = 0.2; } }
+  function doNod(F, ms) { if (gesture(F, 'nod', ms)) { F.smileT = 0.9; } }
+  function doShrug(F, ms) { if (gesture(F, 'shrug', ms)) { F.smileT = 0.5; F.mouthOpenT = 0.15; } }
+  function doCower(F, ms) { if (gesture(F, 'cower', ms)) { F.smileT = 0.2; F.mouthOpenT = 0.8; } }
+
+  /* React to what the user actually did, with a matching gesture. */
+  function reactTo(action) {
+    var F = figures[Math.random() < 0.5 ? 'vinay' : 'nitin'];
+    if (!F || F.dragging || REDUCED) return;
+    if (action === 'chat') {
+      /* someone spoke — turn, nod, then bounce happily */
+      if (gesture(F, 'point', 1100)) F.smileT = 1;
+      later(function () { if (!F.dragging) doJump(F, 26); }, 1150);
+    } else if (action === 'poll') {
+      /* counting votes: a decisive nod then a small hop */
+      if (gesture(F, 'nod', 1000)) F.smileT = 1;
+      later(function () { if (!F.dragging) doJump(F, 22); }, 1050);
+    } else if (action === 'ai') {
+      /* thinking it over: shrug, then a confident point */
+      if (gesture(F, 'shrug', 1100)) {}
+      later(function () { if (!F.dragging) doPoint(F, 1300); }, 1150);
+    } else if (action === 'upload') {
+      burst(F, 6, 'confetti');
+      if (gesture(F, 'nod', 1200)) F.smileT = 1;
+    } else if (action === 'error') {
+      doCower(F, 1100);
+      if (canBubble(F) && Math.random() < 0.7) say(F, pick(['Oops!', 'Try again?', 'Uh oh…']), 1600);
+    }
+  }
+
+  /* Arrival greeting — called once per session by main.js. */
+  function greet(name) {
+    if (REDUCED) return;
+    var F = figures.vinay;
+    if (!F || F.dragging) return;
+    doWave(F, 2200);
+    first = name ? String(name).split(' ')[0] : '';
+    if (canBubble(F)) say(F, first ? ('Hey ' + first + '!') : 'Welcome back!', 2200);
+    burst(F, 6, 'spark');
+    later(function () {
+      var G = figures.nitin;
+      if (G && !G.dragging && G.mode === 'idle') doWave(G, 1800);
+    }, 900);
+  }
+  var first = '';
+
+  /* Look where the reader is scrolling — a subtle, continuous cue that the
+     mascots are watching the same page you are. */
+  function interest(dir) {
+    Object.keys(figures).forEach(function (k) {
+      var F = figures[k];
+      if (!F || F.dragging || REDUCED) return;
+      F.gazeT.y = clamp(dir, -0.5, 0.5);
+      F.headTiltT = clamp(dir * 0.12, -0.16, 0.16);
+    });
   }
 
   /* ---------------- pointer: click + drag & throw ---------------- */
@@ -356,6 +478,7 @@
         F.lastPX = e.clientX; F.lastPY = e.clientY;
         F.x = clamp(F.x + F.vx, 8, window.innerWidth - 8);
         F.yOff = Math.min(0, F.yOff + F.vy);
+        F.spin = 0; F.spinV = 0;
         /* dangle physics driven by acceleration */
         F.dangle.vL += (-F.dangle.aL * 90 - F.vx * 6) * 0.016;
         F.dangle.vR += (-F.dangle.aR * 90 - F.vx * 6) * 0.016;
@@ -372,7 +495,12 @@
         F.vx = clamp(F.vx * 60, -1400, 1400);
         F.vy = clamp(F.vy * 60, -1600, 400);
         if (Math.abs(F.vx) < 60 && Math.abs(F.vy) < 60) { F.mode = 'idle'; F.yOff = 0; }
-        else { F.mode = 'thrown'; F.dizzy = 1; burst(F, 5, 'stars'); }
+        else {
+          F.mode = 'thrown'; F.dizzy = 1;
+          /* tumble proportional to the sideways part of the throw */
+          F.spin = 0; F.spinV = clamp(F.vx / 520, -6, 6);
+          burst(F, 5, 'stars');
+        }
         F.t0 = performance.now();
       } else if (moved <= 9) {
         var now = performance.now();
@@ -394,10 +522,14 @@
           var V = figures.vinay, N = figures.nitin;
           var idleV = V && V.mode === 'idle' && !V.dragging;
           var idleN = N && N.mode === 'idle' && !N.dragging;
-          if (r < 0.50) { /* walk one of them */
+          if (r < 0.42) { /* walk one of them */
             var k = Math.random() < 0.5 ? 'vinay' : 'nitin';
             if (!startWalk(k)) startWalk(k === 'vinay' ? 'nitin' : 'vinay');
-          } else if (r < 0.62 && (idleV || idleN)) {
+          } else if (r < 0.52 && ((V && canClimb(V)) || (N && canClimb(N)))) {
+            /* occasionally send one down a screen edge */
+            var CF = (V && canClimb(V)) ? V : N;
+            if (CF) startClimb(CF); else startWalk('vinay');
+          } else if (r < 0.63 && (idleV || idleN)) {
             var F1 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
             doWave(F1, 1700);
             if (Math.random() < 0.4 && canBubble(F1)) say(F1, pick(QUIPS), 1500);
@@ -453,22 +585,51 @@
         later(function () { F.squashTX = 1; F.squashTY = 1; }, 140);
       }
     } else if (F.mode === 'thrown') {
-      /* gravity world physics */
+      /* Projectile motion with air drag, a bounce, then a skid to rest.
+         spin tracks horizontal velocity so a hard sideways throw tumbles
+         and a straight-up toss stays upright, which is what actually
+         happens to a thrown object. */
       F.vy += 2600 * dt;
       F.x += F.vx * dt;
       F.yOff += F.vy * dt;
       F.vx *= Math.exp(-0.4 * dt);
+      F.spin = (F.spin || 0) + (F.spinV || 0) * dt;
+      F.spinV = (F.spinV || 0) * Math.exp(-1.2 * dt);
       var W = window.innerWidth;
-      if (F.x < 20) { F.x = 20; F.vx = Math.abs(F.vx) * 0.55; }
-      if (F.x > W - 20) { F.x = W - 20; F.vx = -Math.abs(F.vx) * 0.55; }
+      if (F.x < 20) { F.x = 20; F.vx = Math.abs(F.vx) * 0.55; F.spinV *= -0.6; }
+      if (F.x > W - 20) { F.x = W - 20; F.vx = -Math.abs(F.vx) * 0.55; F.spinV *= -0.6; }
       if (F.yOff >= 0) {
         F.yOff = 0;
-        if (Math.abs(F.vy) > 260) { F.vy = -F.vy * 0.45; F.vx *= 0.7; burst(F, 4, 'dust'); F.squashTX = 1.16; F.squashTY = 0.82; later(function () { F.squashTX = 1; F.squashTY = 1; }, 130); }
-        else { F.vy = 0; F.vx *= Math.exp(-6 * dt); if (Math.abs(F.vx) < 25) { F.mode = 'idle'; F.dizzy = Math.max(F.dizzy, 0.7); burst(F, 5, 'stars'); if (canBubble(F)) say(F, pick(['Whoa!', 'Wheee!', 'Again!', 'I\'m ok!']), 1600); } }
+        if (Math.abs(F.vy) > 260) {
+          /* bounce: keep some horizontal speed and scrub it off fast */
+          F.vy = -F.vy * 0.42;
+          F.vx *= 0.62;
+          F.spinV *= 0.45;
+          burst(F, 4, 'dust');
+          F.squashTX = 1.16; F.squashTY = 0.82;
+          later(function () { F.squashTX = 1; F.squashTY = 1; }, 130);
+        } else {
+          F.vy = 0;
+          F.vx *= Math.exp(-7 * dt);
+          F.spinV *= Math.exp(-6 * dt);
+          if (Math.abs(F.vx) < 25 && Math.abs(F.spinV) < 0.25) {
+            F.mode = 'idle'; F.yOff = 0; F.dizzy = Math.max(F.dizzy, 0.7);
+            /* lie still a beat, then spring upright like a recovering acrobat */
+            F.spin = 0; F.spinV = 0;
+            burst(F, 5, 'stars');
+            F.squashTX = 1.1; F.squashTY = 0.9;
+            later(function () {
+              F.squashTX = 1; F.squashTY = 1;
+              if (!REDUCED && Math.random() < 0.6) doJump(F, 26);
+            }, 320);
+            if (canBubble(F)) say(F, pick(['Whoa!', 'Wheee!', 'Again!', "I'm ok!"]), 1600);
+          }
+        }
       }
       F.phase += dt * 14;
       F.dizzy = Math.max(F.dizzy, 0.4);
-    } else if (F.mode === 'wave' || F.mode === 'dance' || F.mode === 'yawn' || F.mode === 'highfive') {
+    } else if (F.mode === 'wave' || F.mode === 'dance' || F.mode === 'yawn' || F.mode === 'highfive' ||
+                 F.mode === 'point' || F.mode === 'nod' || F.mode === 'shrug' || F.mode === 'cower') {
       p = clamp((now - F.t0) / F.dur, 0, 1);
       if (F.mode === 'dance' && Math.random() < dt * 3) burst(F, 1, 'notes');
       if (F.mode === 'yawn' && Math.random() < dt * 1.4) zzz(F);
@@ -481,6 +642,33 @@
       D.vR += (-D.aR * 120 - D.vR * 3.2) * dt; D.aR += D.vR * dt;
       D.uL += (-D.lL * 100 - D.uL * 3.2) * dt; D.lL += D.uL * dt;
       D.uR += (-D.lR * 100 - D.uR * 3.2) * dt; D.lR += D.uR * dt;
+    } else if (F.mode === 'climb') {
+      /* Descend the edge hand over hand. Each limb pair alternates
+         between "gripping" (planted) and "reaching" (moving to the next
+         hold), so the pose keeps changing instead of sliding rigidly. */
+      var C = F.climb;
+      C.timer += dt;
+      if (C.phase === undefined) C.phase = 0;
+      /* one full grip/reach cycle per ~0.9s */
+      var cycle = 0.9;
+      var step = Math.floor(C.timer / cycle);
+      if (step !== C.limb) {
+        C.limb = step;
+        if (Math.random() < 0.7) burst(F, 1, 'dust');   /* grip scuff */
+      }
+      C.progress = (C.timer % cycle) / cycle;
+      /* climb at a steady, believable pace; yOff runs from -(height) to 0 */
+      F.yOff = Math.min(0, F.yOff + C_SPEED * dt);
+      F.x = F.climb.side < 0 ? MIN_X + 12 : MAX_X - 12;
+      F.dir = F.climb.side;
+      F.phase += dt * 2.2;
+      if (F.yOff >= -0.5) {
+        F.yOff = 0;
+        F.mode = 'idle';
+        F.climbCd = performance.now() + rand(30000, 60000);
+        burst(F, 3, 'dust');
+        if (canBubble(F) && Math.random() < 0.5) say(F, pick(['Made it down!', 'Phew!', 'Easy!']), 1500);
+      }
     } else { F.leanT *= 0.9; }
 
     F.dizzy = Math.max(0, F.dizzy - dt * 0.5);
@@ -559,6 +747,21 @@
       hR.x = SH.x + 14 + D.aR * 22; hR.y = 108 + Math.abs(D.aR) * -8 + 6;
       fL.x = 54 + D.lL * 20; fL.y = GY - 4; fR.x = 66 + D.lR * 20; fR.y = GY - 4;
       headY += 3; tilt = clamp((F.lastPX - (figCenter(F).x)) / 200, -0.4, 0.4);
+    } else if (F.mode === 'climb') {
+      /* Hug the wall with the body upright. Limbs alternate between a
+         planted grip and an upward reach, so the pose is never static. */
+      var C = F.climb, sgn = C.side, alt = C.limb % 2;
+      hip.x = 60 + sgn * 2; chest.x = 60 + sgn * 3; headX = 60 + sgn * 4;
+      chest.y = 78 + Math.sin(t * 4) * 1.2;
+      /* feet pressed flat to the wall at two different heights */
+      fL.x = 60 + sgn * 9; fR.x = 60 + sgn * 10;
+      fL.y = GY - 30 + (alt ? 5 : 0);
+      fR.y = GY - 24 - (alt ? 5 : 0);
+      /* hands grip / reach alternately above the head */
+      hL.x = 60 + sgn * 11 - 4; hR.x = 60 + sgn * 11 + 4;
+      hL.y = 40 + (alt ? 10 : 0);
+      hR.y = 34 - (alt ? 10 : 0);
+      tilt = sgn * 0.05;
     } else if (F.mode === 'wave') {
       var wag = Math.sin(t * 16) * 7;
       hR.x = 86 + wag * 0.5; hR.y = 50 + Math.abs(wag) * 0.3;
@@ -579,6 +782,35 @@
       if (F.key === 'vinay') { hR.x = 92; hR.y = 62 - 10 * hf; hL.x = 42; hL.y = 112; }
       else { hL.x = 28; hL.y = 62 - 10 * hf; hR.x = 78; hR.y = 112; }
       headY -= 3 * hf; tilt = F.key === 'vinay' ? -0.1 * hf : 0.1 * hf;
+    } else if (F.mode === 'point') {
+      /* swing the right arm out to indicate something in front of them */
+      var pp = Math.sin(clamp((now - F.t0) / F.dur, 0, 1) * Math.PI);
+      hR.x = 88 + 10 * pp; hR.y = 74 - 14 * pp;
+      hL.x = HAND_L.x - 2; hL.y = HAND_L.y + 1;
+      tilt = 0.1 * pp + F.dir * 0.04;
+      headX += F.dir * 6 * pp;
+    } else if (F.mode === 'nod') {
+      /* agree: two crisp dips of the head, no limb movement */
+      var np = (now - F.t0) / F.dur;
+      var dips = Math.sin(np * Math.PI * 4);
+      headY += 4 * Math.max(0, dips);
+      tilt = 0.05 * dips;
+      hL.y += 1; hR.y += 1;
+    } else if (F.mode === 'shrug') {
+      /* palms up, shoulders lifted — the universal "no idea" */
+      var sp = Math.sin(clamp((now - F.t0) / F.dur, 0, 1) * Math.PI);
+      hL.x = 34 - 8 * sp; hL.y = 96 - 16 * sp;
+      hR.x = 86 + 8 * sp; hR.y = 96 - 16 * sp;
+      chest.y -= 3 * sp; headY -= 1 * sp;
+      tilt = -0.05 * sp;
+    } else if (F.mode === 'cower') {
+      /* startled: recoil, arms up defensively */
+      var cp = Math.sin(clamp((now - F.t0) / F.dur, 0, 1) * Math.PI);
+      hip.y += 5 * cp; chest.y += 6 * cp; headY += 5 * cp;
+      hL.x = 44 - 6 * cp; hL.y = 58 + 4 * cp;
+      hR.x = 76 + 6 * cp; hR.y = 58 + 4 * cp;
+      fL.x -= 3 * cp; fR.x += 3 * cp;
+      tilt = -0.1 * cp;
     } else if (F.mode === 'yawn') {
       hip.y += 4; chest.y += 4; headY += 9; tilt = 0.12;
       hL.y += 7; hR.y += 7; fL.x -= 2; fR.x += 2;
@@ -600,7 +832,7 @@
     if (F.dizzy > 0.01) { tilt += Math.sin(t * 18) * 0.2 * F.dizzy; headX += Math.sin(t * 15) * 3 * F.dizzy; }
 
     /* smooth joints toward targets */
-    var j = dampRate(F.mode === 'walk' || F.mode === 'dance' || F.mode === 'thrown' ? 26 : 11, dt);
+    var j = dampRate(F.mode === 'walk' || F.mode === 'dance' || F.mode === 'thrown' ? 26 : (F.mode === 'climb' ? 18 : 11), dt);
     F.hip.x = lerp(F.hip.x, hip.x, j); F.hip.y = lerp(F.hip.y, hip.y, j);
     F.chest.x = lerp(F.chest.x, chest.x, j); F.chest.y = lerp(F.chest.y, chest.y, j);
     F.handL.x = lerp(F.handL.x, hL.x, j); F.handL.y = lerp(F.handL.y, hL.y, j);
@@ -614,11 +846,15 @@
     hx.vy += ((headY - hx.y) * k2) * dt; hx.vy *= Math.exp(-11 * dt); hx.y += hx.vy * dt;
 
     var shX = F.chest.x, shY = F.chest.y + 6;   /* shoulder follows chest */
-    /* IK solves — knees forward(+x bend by side), elbows out-back */
-    var kL = solveIK(F.hip.x - 2, F.hip.y, F.footL.x, F.footL.y, L_UPPER, L_LOWER, -1);
-    var kR = solveIK(F.hip.x + 2, F.hip.y, F.footR.x, F.footR.y, L_UPPER, L_LOWER, 1);
-    var eL = solveIK(shX - 2, shY, F.handL.x, F.handL.y, A_UPPER, A_LOWER, -1);
-    var eR = solveIK(shX + 2, shY, F.handR.x, F.handR.y, A_UPPER, A_LOWER, 1);
+    /* IK solves. The bend sign must push each joint AWAY from the body
+       centreline: positive bend bows the joint toward -x, negative toward +x.
+       Left limbs therefore bend positive and right limbs negative. Getting
+       these signs backwards collapses both knees onto the centreline and the
+       figure reads as if its legs are folded. */
+    var kL = solveIK(F.hip.x - 2, F.hip.y, F.footL.x, F.footL.y, L_UPPER, L_LOWER, 0.34);
+    var kR = solveIK(F.hip.x + 2, F.hip.y, F.footR.x, F.footR.y, L_UPPER, L_LOWER, -0.34);
+    var eL = solveIK(shX - 2, shY, F.handL.x, F.handL.y, A_UPPER, A_LOWER, 0.5);
+    var eR = solveIK(shX + 2, shY, F.handR.x, F.handR.y, A_UPPER, A_LOWER, -0.5);
 
     function setL(el, x1, y1, x2, y2) { el.setAttribute('x1', x1.toFixed(1)); el.setAttribute('y1', y1.toFixed(1)); el.setAttribute('x2', x2.toFixed(1)); el.setAttribute('y2', y2.toFixed(1)); }
     function setC(el, cx, cy) { el.setAttribute('cx', cx.toFixed(1)); el.setAttribute('cy', cy.toFixed(1)); }
@@ -632,15 +868,25 @@
     /* head group: position + tilt */
     var tiltDeg = (F.headTilt * 57.3).toFixed(1);
     E.headG.setAttribute('transform', 'translate(' + (hx.x - HEAD.x).toFixed(1) + ' ' + (hx.y - HEAD.y).toFixed(1) + ') rotate(' + tiltDeg + ' 60 46)');
-    /* headband flutter intentionally removed — the trailing lines read
-       as a ponytail, which makes the mascot look feminine */
-    /* eyes: blink + pupils track gaze */
-    var eyeRy = blinking ? 0.25 : 2.3;
-    E.eyeL.setAttribute('ry', eyeRy.toFixed(2)); E.eyeR.setAttribute('ry', eyeRy.toFixed(2));
+    /* Neck is drawn in root coordinates from the live shoulder/chest anchor to
+       the head's bottom edge, so springy head lag never detaches it. */
+    if (E.neck) {
+      var neckTopY = hx.y + 13.5;             /* head's bottom edge */
+      var neckBotY = F.chest.y + 2;           /* chest anchor, always lower */
+      if (neckBotY - neckTopY < 2) neckBotY = neckTopY + 2;
+      setL(E.neck, F.chest.x, neckBotY, hx.x, neckTopY);
+    }
+    /* eyes: blink by squashing the pupil dots vertically, then let them
+       track the gaze. Keeping the blink to a scaleY on two circles is much
+       cheaper than swapping art, and reads clearly at mascot size. */
+    var blinkSquash = blinking ? 0.12 : 1;
     var px = F.gaze.x * 1.1, py = F.gaze.y * 1.2;
     E.pupL.setAttribute('cx', (55 + px).toFixed(1)); E.pupL.setAttribute('cy', (45.5 + py).toFixed(1));
     E.pupR.setAttribute('cx', (65 + px).toFixed(1)); E.pupR.setAttribute('cy', (45.5 + py).toFixed(1));
-    E.pupL.setAttribute('opacity', blinking ? 0 : 1); E.pupR.setAttribute('opacity', blinking ? 0 : 1);
+    var lidY = (45.5 + py).toFixed(1);
+    var lid = blinking ? 'translate(0 ' + lidY + ') scale(1 ' + blinkSquash + ') translate(0 -' + lidY + ')' : null;
+    if (lid) { E.pupL.setAttribute('transform', lid); E.pupR.setAttribute('transform', lid); }
+    else { E.pupL.removeAttribute('transform'); E.pupR.removeAttribute('transform'); }
     /* mouth: smile <-> frown morph + open (surprise/yawn) */
     var sm = clamp(F.smile, -1, 1);
     E.mouth.setAttribute('d', 'M55 53 Q60 ' + (53 + sm * 4.2).toFixed(1) + ' 65 53');
@@ -656,8 +902,9 @@
     E.shadow.setAttribute('opacity', (0.28 * (1 - airH * 0.6)).toFixed(2));
     E.shadow.setAttribute('rx', (15 * (1 - airH * 0.3)).toFixed(1));
 
-    /* world position */
-    F.el.style.transform = 'translate3d(' + F.x.toFixed(1) + 'px,' + (F.y + F.yOff).toFixed(1) + 'px,0)';
+    /* world position — thrown figures also tumble about their own centre */
+    var rot = F.spin ? ' rotate(' + (F.spin * 57.3).toFixed(1) + 'deg)' : '';
+    F.el.style.transform = 'translate3d(' + F.x.toFixed(1) + 'px,' + (F.y + F.yOff).toFixed(1) + 'px,0)' + rot;
   }
 
   var lastFrameAt = 0;
@@ -768,7 +1015,24 @@
     if (toggleBtn) { toggleBtn.remove(); toggleBtn = null; }
   }
 
-  window.StickMen = { __v: 5, init: init, destroy: destroy, celebrate: celebrate, say: function (k, t) { var F = figures[k]; if (F) say(F, t); }, wave: function (k) { var F = figures[k]; if (F) doWave(F, 1700); } };
+  window.StickMen = {
+    __v: 5, init: init, destroy: destroy, celebrate: celebrate,
+    say: function (k, t) { var F = figures[k]; if (F) say(F, t); },
+    wave: function (k) { var F = figures[k]; if (F) doWave(F, 1700); },
+    greet: greet,
+    react: reactTo,
+    interest: interest,
+    /* Introspection for tests and for the admin debug view: what each mascot
+       is doing right now. Read-only. */
+    state: function () {
+      var out = {};
+      Object.keys(figures).forEach(function (k) {
+        var F = figures[k];
+        out[k] = { mode: F.mode, x: Math.round(F.x), yOff: Math.round(F.yOff), dragging: !!F.dragging };
+      });
+      return out;
+    }
+  };
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function () { if (!stage) init(); });
   } else if (!stage) { init(); }

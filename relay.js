@@ -46,7 +46,8 @@
     aia_polls: 'pl', aia_student_profiles: 'sp', aia_subject_content: 'sc',
     aia_subject_photos: 'ph', aia_ai_config: 'ac', aia_theme: 'th',
     aia_presence: 'pr', aia_ai_log: 'ag', aia_chat_mode: 'cm2',
-    aia_files: 'fl', aia_credentials_overrides: 'co'
+    aia_files: 'fl', aia_credentials_overrides: 'co',
+    aia_class_chat_deleted: 'cd', aia_activity_log: 'al'
   };
   var LONG = {};
   Object.keys(SHORT).forEach(function (k) { LONG[SHORT[k]] = k; });
@@ -122,7 +123,8 @@
       if (v === null) return;
       if (k === 'aia_class_chat') v = capChat(v);
       else if (k === 'aia_subject_photos') v = trimPhotos(v);
-      else if (k === 'aia_activity_log' || k === 'aia_ai_log') return; /* too heavy for live */
+      else if (k === 'aia_activity_log') v = capActivity(v);
+      else if (k === 'aia_ai_log') return; /* too heavy for live */
       var size = sk.length + v.length + 6;
       if (payloadBytes + size > MAX_BYTES) flush();
       payload[sk] = v;
@@ -153,6 +155,31 @@
       Object.keys(obj).forEach(function (k) { out[k] = (obj[k] || []).slice(-4); });
       return JSON.stringify(out);
     } catch (e) { return '{}'; }
+  }
+  /* Activity log: ship only entries this device hasn't published yet, and
+     never the whole history — the admin Activity tab on another device needs
+     to see what classmates are doing, but the payload has to stay small.
+     Merging is additive + id-deduped, so trimming here loses nothing. */
+  var publishedActivity = {};
+  function capActivity(jsonStr) {
+    try {
+      var arr = JSON.parse(jsonStr);
+      if (!Array.isArray(arr)) return '[]';
+      var fresh = [];
+      for (var i = 0; i < arr.length; i++) {
+        var e = arr[i];
+        if (!e) continue;
+        var id = (e.username || '') + '|' + (e.at || '') + '|' + (e.action || '') + '|' + (e.page || '');
+        if (!publishedActivity[id]) { publishedActivity[id] = 1; fresh.push(e); }
+      }
+      if (!fresh.length) return '[]';
+      var out = fresh.slice(-25);
+      publishedActivity = {};                 /* keep the map from growing forever */
+      out.forEach(function (e) {
+        publishedActivity[(e.username || '') + '|' + (e.at || '') + '|' + (e.action || '') + '|' + (e.page || '')] = 1;
+      });
+      return JSON.stringify(out);
+    } catch (e) { return '[]'; }
   }
 
   function post(body, i) {

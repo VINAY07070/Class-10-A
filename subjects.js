@@ -1,7 +1,7 @@
 /* ============================================
-   Subject Hub — 6 subjects with notes, photos,
-   homework links, resources + GitHub data.
-   Admin can edit notes/photos in admin panel.
+   Subject Hub — 6 subjects with notes, photos
+   and homework links. Admin can edit notes and
+   photos in the admin panel.
    ============================================ */
 
 (function () {
@@ -9,7 +9,6 @@
 
   var pillsEl = document.getElementById('subjectPills');
   var gridEl = document.getElementById('subjectGrid');
-  var githubEl = document.getElementById('githubResources');
   var modal = document.getElementById('subjectModal');
   var modalContent = document.getElementById('subjectModalContent');
 
@@ -147,52 +146,9 @@
   modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
-  /* ---------- GitHub resources ---------- */
-  function currentGithubUrl() { return DataStore.getGithubUrl(); }
-
-  function renderGithub(resources) {
-    var hasAny = resources && (resources.resources && resources.resources.length || resources.links && resources.links.length);
-    if (!hasAny) {
-      githubEl.innerHTML = '<div class="text-muted" style="text-align:center;padding:18px"><i class="fa-solid fa-inbox"></i> No GitHub resources configured yet. The admin can add a public JSON URL in the admin panel → Subjects.</div>';
-      return;
-    }
-    var items = resources.resources || resources.links || [];
-    githubEl.innerHTML = '<div class="github-title"><i class="fa-brands fa-github"></i> ' + App.escapeHtml(resources.title || 'Online Resources') + '</div>' +
-      '<div class="github-list">' + items.map(function (r) {
-        var url = r.url || '#';
-        var desc = r.description || r.note || '';
-        return '<a class="github-item" href="' + App.escapeHtml(url) + '" target="_blank" rel="noopener">' +
-          '<i class="fa-solid fa-arrow-up-right-from-square"></i>' +
-          '<div><strong>' + App.escapeHtml(r.title || r.name || url) + '</strong>' +
-          (desc ? '<div class="text-muted" style="font-size:.8rem">' + App.escapeHtml(desc) + '</div>' : '') +
-          '</div></a>';
-      }).join('') + '</div>';
-  }
-
-  function loadGithub() {
-    var GITHUB_URL = currentGithubUrl();
-    if (!GITHUB_URL) { renderGithub(null); return; }
-    var cached = DataStore.getGithubData();
-    if (cached && cached.url === GITHUB_URL) { renderGithub(cached.data); return; }
-    fetch(GITHUB_URL)
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (data) {
-        DataStore.setGithubData({ url: currentGithubUrl(), data: data, fetchedAt: new Date().toISOString() });
-        renderGithub(data);
-        if (data.resources && data.resources.length) App.showToast('Resources synced from GitHub 🚀', 'success');
-      })
-      .catch(function () {
-        if (cached) renderGithub(cached.data);
-        else {
-          githubEl.innerHTML = '<div class="text-muted" style="text-align:center;padding:18px"><i class="fa-solid fa-plug-circle-xmark"></i> Could not fetch GitHub data (offline or blocked). Admin can set the URL in the admin panel.</div>';
-        }
-      });
-  }
-
   /* ---------- boot ---------- */
   renderPills();
   renderGrid();
-  loadGithub();
   App.observeReveals(gridEl);
   var sjT = 0;
   window.__aiaRefresh = function () {

@@ -168,11 +168,6 @@
             </div>
             <button class="btn btn-primary" id="saveSubjBtn"><i class="fa-solid fa-floppy-disk"></i> Save Subject</button>
           </div>
-          <div class="admin-form" style="margin-top:20px">
-            <h3 class="heading-sm">GitHub Resources URL</h3>
-            <div class="form-group"><label>Public JSON URL (see Settings → Backup for format)</label><input type="text" id="githubUrlInput" placeholder="https://raw.githubusercontent.com/.../resources.json"></div>
-            <button class="btn btn-primary" id="saveGithubBtn"><i class="fa-solid fa-cloud-arrow-down"></i> Save & Fetch</button>
-          </div>
         </div>
 
         <!-- AI BOT -->
@@ -210,7 +205,20 @@
         <!-- USERS -->
         <div class="admin-panel" id="panel-users">
           <div class="admin-form">
-            <h3 class="heading-sm">User Stats & Passwords</h3>
+            <h3 class="heading-sm">Student Logins — usernames &amp; passwords</h3>
+            <p class="text-secondary" style="font-size:0.88rem;margin:8px 0 12px">
+              Every student on the class roster has a login. Passwords are shown in plain text so you can share them.
+            </p>
+            <div class="cred-actions">
+              <button class="btn btn-primary btn-sm" id="genCredsBtn"><i class="fa-solid fa-key"></i> Generate missing logins</button>
+              <button class="btn btn-secondary btn-sm" id="copyCredsBtn"><i class="fa-solid fa-copy"></i> Copy all</button>
+              <button class="btn btn-secondary btn-sm" id="downloadCredsBtn"><i class="fa-solid fa-download"></i> Download CSV</button>
+            </div>
+            <div id="credGenResult" class="text-muted" style="font-size:0.82rem;margin:8px 0 0"></div>
+            <div id="credTable" class="user-stats-table" style="margin-top:14px"></div>
+          </div>
+          <div class="admin-form" style="margin-top:22px">
+            <h3 class="heading-sm">User Stats &amp; Activity</h3>
             <div id="userStatsTable" class="user-stats-table"></div>
           </div>
         </div>

@@ -33,6 +33,7 @@
           return;
         }
         App.showToast('Vote submitted! 🎉', 'success');
+        try { DataStore.logAction('poll', 'Voted in a poll', 'polls.html'); } catch (e) {}
         var r = opt.getBoundingClientRect();
         App.burstConfetti({ x: r.left + r.width / 2, y: r.top });
         try { if (window.StickMen) StickMen.celebrate(); } catch (e) {}

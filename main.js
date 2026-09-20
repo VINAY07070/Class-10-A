@@ -398,6 +398,9 @@ var App = (function () {
   function initParticles(canvasId) {
     var canvas = document.getElementById(canvasId);
     if (!canvas) return;
+    /* lite devices hide the canvas in CSS; skip the loop entirely so we
+       don't keep a rAF running against an invisible element. */
+    if (window.AiaPerf && window.AiaPerf.lite) return;
     var ctx = canvas.getContext('2d');
     if (!ctx) return;
     var w, h, particles = [], raf = 0, running = true;
@@ -419,6 +422,11 @@ var App = (function () {
     window.addEventListener('resize', resize);
 
     var density = lowPower ? 42000 : (smallScreen ? 26000 : 13000);
+    /* The hero canvas is the one thing here that repaints every frame, so
+       it is the first place to spend the "quiet" budget: two thirds of the
+       particles are invisible at a glance but cost a full-frame clear and
+       many arcs per frame. */
+    if (perf.quiet) density *= 2.4;
     var count = reduced ? 14 : Math.min(lowPower ? 26 : (smallScreen ? 42 : 85), Math.floor(w * h / density));
     for (var i = 0; i < count; i++) {
       particles.push({
@@ -789,6 +797,34 @@ var App = (function () {
      ================================================================== */
   function initStickMen() {
     if (window.StickMen && StickMen.init) StickMen.init();
+    if (!window.StickMen || !StickMen.greet) return;
+    /* Greet the signed-in user once, and have the mascots react to what the
+       user actually does (sending chat, voting, asking the AI). Both are
+       scheduled low priority so they never delay first interaction. */
+    setTimeout(function () {
+      var name = '';
+      try {
+        var s = window.DataStore && DataStore.getSession && DataStore.getSession();
+        name = s && s.name ? s.name : '';
+      } catch (e) {}
+      try { StickMen.greet(name); } catch (e) {}
+    }, 1400);
+    var ACTION_GESTURE = { chat: 'chat', poll: 'poll', ai: 'ai', upload: 'upload', error: 'error' };
+    document.addEventListener('aia-stickman-react', function (e) {
+      var a = e.detail && e.detail.action;
+      if (a && ACTION_GESTURE[a]) { try { StickMen.react(ACTION_GESTURE[a]); } catch (err) {} }
+    });
+    /* eyes follow the reading direction while scrolling */
+    if (!window.AiaPerf || !window.AiaPerf.lite) {
+      var lastY = window.scrollY, idleT = 0;
+      window.addEventListener('scroll', function () {
+        var y = window.scrollY;
+        var dir = Math.max(-1, Math.min(1, (y - lastY) / 60));
+        lastY = y;
+        clearTimeout(idleT);
+        idleT = setTimeout(function () { StickMen.interest(dir); }, 60);
+      }, { passive: true });
+    }
   }
 
   /* ==================================================================

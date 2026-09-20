@@ -40,6 +40,12 @@
       name.slice(idx, idx + query.length) + '</mark>' + name.slice(idx + query.length);
   }
 
+  var HIGHLIGHTS = {
+    'VINAY KHILERI': 'admin',
+    'NITIN': 'admin'
+  };
+  function highlightRole(name) { return HIGHLIGHTS[String(name).toUpperCase()] || ''; }
+
   function render(searchTerm) {
     var query = (searchTerm || '').trim();
     var filtered = students.filter(function (s) {
@@ -49,12 +55,15 @@
       var profile = getProfile(name);
       var hasProfile = !!profile;
       var initials = name.split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2);
-      var isAdmin = name.toUpperCase() === 'VINAY KHILERI';
+      var role = highlightRole(name);
+      var isFounder = String(name).toUpperCase() === 'VINAY KHILERI';
       var num = students.indexOf(name) + 1;
       var grad = AVATAR_GRADIENTS[num % AVATAR_GRADIENTS.length];
-      return '<div class="student-card reveal ' + (query ? 'highlight' : '') + '" data-name="' + name + '" tabindex="0" role="button"' +
+      return '<div class="student-card reveal ' + (query ? 'highlight' : '') +
+        (role ? ' student-' + role + (isFounder ? ' student-founder' : '') : '') +
+        '" data-name="' + name + '" tabindex="0" role="button"' +
         ' style="animation-delay:' + (i * 0.025) + 's">' +
-        (isAdmin ? '<span class="admin-badge">ADMIN</span>' : '') +
+        (role ? '<span class="admin-badge">' + (isFounder ? 'FOUNDER' : 'ADMIN') + '</span>' : '') +
         '<div class="student-avatar" style="background:' + grad + '">' + initials + '</div>' +
         '<div class="student-name">' + highlight(name, query) + '</div>' +
         '<div class="student-number">#' + num + (hasProfile ? ' •  Profile' : '') + '</div>' +
@@ -90,6 +99,7 @@
     var profile = getProfile(name);
     var initials = name.split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2);
     var isAdmin = name.toUpperCase() === 'VINAY KHILERI';
+    var isCoAdmin = name.toUpperCase() === 'NITIN';
     var num = students.indexOf(name) + 1;
     var grad = AVATAR_GRADIENTS[num % AVATAR_GRADIENTS.length];
 
@@ -97,7 +107,8 @@
     html += '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap">';
     html += '<div class="modal-avatar" style="background:' + grad + '">' + initials + '</div>';
     html += '<div><h2 class="heading-md">' + name + '</h2>';
-    html += '<div class="text-muted" style="font-size:0.85rem">Student #' + num + (isAdmin ? ' • 👑 Class Admin' : '') + '</div>';
+    html += '<div class="text-muted" style="font-size:0.85rem">Student #' + num +
+      (isAdmin ? ' • 👑 Class Admin' : (isCoAdmin ? ' • 👑 Admin' : '')) + '</div>';
     html += '</div></div>';
 
     if (!profile) {

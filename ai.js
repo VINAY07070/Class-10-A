@@ -258,6 +258,7 @@
     busy = true;
     inputEl.value = '';
     DataStore.addAiMessage(HISTORY_KEY, 'user', text);
+    try { DataStore.logAction('ai', 'Asked the AI a question', 'ai.html'); } catch (e) {}
     messagesEl.appendChild(msgBubble(USER.name, text, 'user'));
     showTyping();
 

@@ -261,6 +261,40 @@ var DataStore = (function () {
     overrides.forEach(function (c) { map[c.username.toLowerCase()] = c; });
     return Object.keys(map).map(function (k) { return map[k]; });
   }
+  function _randPw(n) {
+    var c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    var s = '';
+    for (var i = 0; i < n; i++) s += c[Math.floor(Math.random() * c.length)];
+    return s;
+  }
+  /* Make sure every student on the roster has a working username/password.
+     Existing credentials are never touched. Returns the full list plus the
+     names that were newly generated. */
+  function ensureAllCredentials() {
+    var list = getCredentials().slice();
+    var have = {};
+    list.forEach(function (c) { have[String(c.name).toUpperCase()] = true; });
+    var used = {};
+    list.forEach(function (c) { used[String(c.username).toLowerCase()] = true; });
+    var created = [];
+    getStudents().forEach(function (name) {
+      var key = String(name).toUpperCase();
+      if (have[key]) return;
+      var base = key.replace(/[^A-Z]/g, '').slice(0, 3) || 'STU';
+      if (base.length < 3) base = (base + 'STU').slice(0, 3);
+      var uname, tries = 0;
+      do {
+        uname = base + String(Math.floor(100 + Math.random() * 900));
+        tries++;
+      } while (used[uname.toLowerCase()] && tries < 60);
+      used[uname.toLowerCase()] = true;
+      var cred = { name: name, username: uname, password: _randPw(6) };
+      list.push(cred);
+      created.push(cred);
+    });
+    if (created.length) _set('aia_credentials_overrides', list);
+    return { list: list, created: created };
+  }
 
   /* ---------- class chat ---------- */
   /* Applies the shared "deleted message ids" tombstone list, so a message
@@ -357,17 +391,42 @@ var DataStore = (function () {
 
   /* ---------- activity tracking ---------- */
   function getActivityLog() { return _get(KEYS.activityLog, []); }
-  function logActivity(page, name) {
+  function logActivity(page, name, action, detail) {
     var s = getSession();
     var who = name || (s ? s.name : 'Visitor');
     var username = s ? s.username : 'visitor';
     var l = getActivityLog();
-    l.push({ user: who, username: username, page: page, at: new Date().toISOString() });
-    if (l.length > 800) l = l.slice(-800);
+    l.push({
+      user: who, username: username, page: page,
+      action: action || 'visit', detail: detail || '',
+      at: new Date().toISOString()
+    });
+    if (l.length > 1200) l = l.slice(-1200);
     _set(KEYS.activityLog, l);
     var p = getPresence();
-    p[username] = { name: who, lastSeen: Date.now(), page: page };
+    var seenAt = Date.now();
+    /* `at` mirrors `lastSeen` as an ISO string: the sync merge engine picks
+       the newer of two presence entries via `at`/`updatedAt`, and without it
+       remote devices could never overwrite a stale local presence record. */
+    p[username] = {
+      name: who, username: username, lastSeen: seenAt,
+      at: new Date(seenAt).toISOString(),
+      page: page, action: action || 'visit', detail: detail || ''
+    };
     _set(KEYS.presence, p);
+  }
+  /* Record a meaningful in-page action ("sent a chat message", "answered a
+     poll", …) against the current user. */
+  function logAction(action, detail, page) {
+    var s = getSession();
+    logActivity(page || (document.body && document.body.getAttribute('data-page')) || '', null, action, detail);
+    /* One place to fan a notable action out to the mascots: every caller of
+       logAction (chat, polls, AI, uploads) then gets a matching reaction
+       without each page having to remember to ask for one. */
+    try {
+      document.dispatchEvent(new CustomEvent('aia-stickman-react', { detail: { action: action, detail: detail } }));
+    } catch (e) {}
+    return s;
   }
   function getPresence() { return _get(KEYS.presence, {}); }
   function getOnlineUsers(maxAgeMs) {
@@ -380,15 +439,55 @@ var DataStore = (function () {
     });
     return out.sort(function (a, b) { return b.lastSeen - a.lastSeen; });
   }
+  /* Aggregate per-user activity: page visits, notable actions, chat and AI
+     usage. Names come from the real student roster only. */
   function getUserStats() {
     var log = getActivityLog();
     var stats = {};
+    function ensure(username, name) {
+      if (!stats[username]) {
+        stats[username] = {
+          name: name, username: username, pages: {}, pageCount: 0,
+          actions: {}, actionCount: 0, lastSeen: null, firstSeen: null,
+          recent: [], chats: 0, ai: 0
+        };
+      }
+      var st = stats[username];
+      if (name && (!st.name || st.name === 'Visitor' || st.name === 'ADMIN')) st.name = name;
+      return st;
+    }
     log.forEach(function (e) {
-      if (!stats[e.username]) stats[e.username] = { name: e.user, pages: {}, pageCount: 0, lastSeen: e.at, messages: 0 };
-      var st = stats[e.username];
+      var st = ensure(e.username, e.user);
       st.pageCount++;
-      st.pages[e.page] = (st.pages[e.page] || 0) + 1;
+      if (e.page) st.pages[e.page] = (st.pages[e.page] || 0) + 1;
+      var act = e.action || 'visit';
+      st.actions[act] = (st.actions[act] || 0) + 1;
+      if (act !== 'visit') st.actionCount++;
       if (!st.lastSeen || new Date(e.at) > new Date(st.lastSeen)) st.lastSeen = e.at;
+      if (!st.firstSeen || new Date(e.at) < new Date(st.firstSeen)) st.firstSeen = e.at;
+    });
+    /* recent trail, newest first, capped for display */
+    var byUser = {};
+    log.slice().reverse().forEach(function (e) {
+      var st = ensure(e.username, e.user);
+      byUser[e.username] = byUser[e.username] || 0;
+      if (byUser[e.username] < 12) {
+        st.recent.push({ page: e.page, action: e.action || 'visit', detail: e.detail || '', at: e.at });
+        byUser[e.username]++;
+      }
+    });
+    /* chat counts by username */
+    getClassChat().forEach(function (m) {
+      if (!m || !m.username) return;
+      var st = ensure(m.username, m.name);
+      st.chats++;
+    });
+    /* AI usage counts. The global AI log keys entries by username in `user`. */
+    getAiLog().forEach(function (m) {
+      if (!m || !m.user) return;
+      var st = ensure(m.user, null);
+      st.ai++;
+      if (m.role === 'user') st.aiPrompts = (st.aiPrompts || 0) + 1;
     });
     return stats;
   }
@@ -543,12 +642,13 @@ var DataStore = (function () {
     getAdminAuth: getAdminAuth, setAdminAuth: setAdminAuth, isAdminAuthed: isAdminAuthed, isFullAdmin: isFullAdmin, verifyPass: verifyPass,
     getSession: getSession, setSession: setSession, clearSession: clearSession, isLoggedIn: isLoggedIn, isAdminUser: isAdminUser,
     getCredentials: getCredentials, getEffectiveCredentials: getEffectiveCredentials,
+    ensureAllCredentials: ensureAllCredentials,
     findCredentialsByName: findCredentialsByName, authenticate: authenticate, resetPassword: resetPassword,
     getClassChat: getClassChat, addClassChat: addClassChat, setClassChat: setClassChat,
     deleteClassChat: deleteClassChat, deleteClassChatById: deleteClassChatById, clearClassChat: clearClassChat,
     getAiHistory: getAiHistory, addAiMessage: addAiMessage, clearAiHistory: clearAiHistory,
     getAiLog: getAiLog, clearAiLog: clearAiLog,
-    getActivityLog: getActivityLog, logActivity: logActivity,
+    getActivityLog: getActivityLog, logActivity: logActivity, logAction: logAction,
     getPresence: getPresence, getOnlineUsers: getOnlineUsers, getUserStats: getUserStats,
     getAiConfig: getAiConfig, setAiConfig: setAiConfig,
     getSubjects: getSubjects,

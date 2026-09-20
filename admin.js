@@ -115,32 +115,171 @@
   }
 
   /* ---------- live activity ---------- */
+  var ACTION_META = {
+    visit: { icon: 'fa-eye', label: 'Visited' },
+    chat: { icon: 'fa-comment', label: 'Chatted' },
+    upload: { icon: 'fa-paperclip', label: 'Shared a file' },
+    ai: { icon: 'fa-robot', label: 'Used the AI' },
+    poll: { icon: 'fa-square-poll-vertical', label: 'Voted' },
+    login: { icon: 'fa-right-to-bracket', label: 'Logged in' },
+    profile: { icon: 'fa-id-card', label: 'Edited a profile' }
+  };
+  function actionIcon(e) { return (ACTION_META[e.action] || ACTION_META.visit).icon; }
+  function actionLabel(e) {
+    var m = ACTION_META[e.action] || ACTION_META.visit;
+    return e.detail ? e.detail : m.label + (e.page ? ' ' + e.page : '');
+  }
+  function prettyPage(p) { return String(p || '').replace('.html', '') || 'hub'; }
+  function isAdminUser(username, name) {
+    return String(username || '').indexOf('admin_') === 0 ||
+      String(name || '').toUpperCase() === 'VINAY KHILERI';
+  }
+
   function renderActivity() {
     var onlineEl = document.getElementById('onlineNow');
     var feedEl = document.getElementById('activityFeed');
     if (!onlineEl || !feedEl || !DataStore.isAdminAuthed()) return;
 
     var online = DataStore.getOnlineUsers();
-    onlineEl.innerHTML = '<div class="online-title"><span class="pulse-dot"></span> Online now</div>' +
+    onlineEl.innerHTML = '<div class="online-title"><span class="pulse-dot"></span> Online now (' + online.length + ')</div>' +
       (online.length
-        ? online.map(function (u) { return '<span class="online-user"><i class="fa-solid fa-circle"></i> ' + App.escapeHtml(u.name) + (u.page ? ' <span class="text-muted">· ' + App.escapeHtml(u.page) + '</span>' : '') + '</span>'; }).join('')
+        ? online.map(function (u) {
+            var act = u.action && u.action !== 'visit' ? u.action : 'browsing';
+            return '<span class="online-user" title="' + App.escapeHtml(u.detail || '') + '">' +
+              '<i class="fa-solid fa-circle"></i> ' + App.escapeHtml(u.name) +
+              ' <span class="text-muted">· ' + App.escapeHtml(act) + ' ' +
+              (u.page ? '@ ' + App.escapeHtml(prettyPage(u.page)) : '') + '</span></span>';
+          }).join('')
         : '<span class="text-muted">Nobody online right now.</span>');
 
-    var log = DataStore.getActivityLog().slice().reverse().slice(0, 40);
-    feedEl.innerHTML = log.length
-      ? log.map(function (e) {
-          var icon = 'fa-circle-user';
-          if (e.page === 'index.html') icon = 'fa-house';
-          else if (e.page === 'chat.html') icon = 'fa-message';
-          else if (e.page === 'ai.html') icon = 'fa-robot';
-          else if (e.page === 'subjects.html') icon = 'fa-book-open';
-          else if (e.page === 'admin.html') icon = 'fa-gear';
-          return '<div class="activity-item"><span class="activity-icon"><i class="fa-solid ' + icon + '"></i></span>' +
-            '<span class="activity-user">' + App.escapeHtml(e.user) + '</span>' +
-            '<span class="activity-page">' + App.escapeHtml(e.page) + '</span>' +
-            '<span class="activity-time">' + App.timeAgo(e.at) + '</span></div>';
+    var log = DataStore.getActivityLog().slice().reverse();
+
+    /* Group the newest entries per user so every student gets their own
+       section: what they are doing, where, and when. */
+    var order = [], groups = {};
+    log.forEach(function (e) {
+      var k = e.username || 'visitor';
+      if (!groups[k]) { groups[k] = { name: e.user, items: [], last: e.at }; order.push(k); }
+      if (groups[k].items.length < 8) groups[k].items.push(e);
+      if (e.at > groups[k].last) groups[k].last = e.at;
+    });
+    /* most recently active first */
+    order.sort(function (a, b) { return new Date(groups[b].last) - new Date(groups[a].last); });
+    order = order.slice(0, 25);
+
+    feedEl.innerHTML = order.length
+      ? order.map(function (k) {
+          var g = groups[k];
+          return '<div class="activity-user-block">' +
+            '<div class="activity-user-head">' +
+              '<span class="activity-user-name"><i class="fa-solid fa-circle-user"></i> ' + App.escapeHtml(g.name) + '</span>' +
+              '<span class="activity-user-sub">@' + App.escapeHtml(k) + ' · ' +
+                (isAdminUser(k, g.name) ? '<span class="admin-chip">ADMIN</span>' : g.items.length + ' recent') +
+              ' · last ' + App.timeAgo(g.last) + '</span>' +
+            '</div>' +
+            '<ul class="activity-user-items">' + g.items.map(function (e) {
+              return '<li><i class="fa-solid ' + actionIcon(e) + '"></i>' +
+                '<span class="act-text">' + App.escapeHtml(actionLabel(e)) + '</span>' +
+                '<span class="act-time">' + App.timeAgo(e.at) + '</span></li>';
+            }).join('') + '</ul>' +
+          '</div>';
         }).join('')
       : '<div class="text-muted" style="text-align:center;padding:20px">No activity yet — students will show up here as they visit pages.</div>';
+  }
+
+  /* ---------- student credentials ---------- */
+  function credRows() {
+    var creds = DataStore.getEffectiveCredentials().slice();
+    var roster = DataStore.getStudents();
+    /* roster order first, then anything else */
+    var order = {};
+    roster.forEach(function (n, i) { order[String(n).toUpperCase()] = i; });
+    creds.sort(function (a, b) {
+      var ai = order[String(a.name).toUpperCase()], bi = order[String(b.name).toUpperCase()];
+      if (ai === undefined) ai = 9999; if (bi === undefined) bi = 9999;
+      return ai - bi || String(a.name).localeCompare(String(b.name));
+    });
+    return creds;
+  }
+  function credCsv() {
+    var lines = ['Student,Username,Password,Role'];
+    credRows().forEach(function (c) {
+      var role = isAdminUser(c.username, c.name) ? 'admin' : 'student';
+      lines.push([c.name, c.username, c.password, role]
+        .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','));
+    });
+    return lines.join('\n');
+  }
+  function renderCreds() {
+    var el = document.getElementById('credTable');
+    if (!el) return;
+    var creds = credRows();
+    var missing = DataStore.getStudents().filter(function (n) {
+      return !creds.some(function (c) { return String(c.name).toUpperCase() === String(n).toUpperCase(); });
+    });
+    el.innerHTML = (missing.length
+      ? '<div class="cred-warn"><i class="fa-solid fa-triangle-exclamation"></i> ' + missing.length +
+        ' student' + (missing.length > 1 ? 's have' : ' has') + ' no login yet: ' + App.escapeHtml(missing.join(', ')) + '</div>'
+      : '<div class="cred-ok"><i class="fa-solid fa-circle-check"></i> All ' + DataStore.getStudents().length + ' students have logins.</div>') +
+      '<table class="admin-table"><thead><tr><th>#</th><th>Student</th><th>Username</th><th>Password</th><th></th></tr></thead><tbody>' +
+      creds.map(function (c, i) {
+        return '<tr><td>' + (i + 1) + '</td>' +
+          '<td><strong>' + App.escapeHtml(c.name) + '</strong>' +
+            (isAdminUser(c.username, c.name) ? ' <span class="admin-chip">ADMIN</span>' : '') + '</td>' +
+          '<td><code>' + App.escapeHtml(c.username) + '</code></td>' +
+          '<td><code>' + App.escapeHtml(c.password) + '</code></td>' +
+          '<td><button class="btn btn-secondary btn-sm copy-cred" data-user="' + App.escapeHtml(c.username) + '" title="Copy"><i class="fa-solid fa-copy"></i></button></td></tr>';
+      }).join('') + '</tbody></table>';
+    bindCopy(el);
+  }
+  function bindCopy(scope) {
+    scope.querySelectorAll('.copy-cred').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var u = btn.getAttribute('data-user');
+        var c = DataStore.getEffectiveCredentials().find(function (x) { return x.username.toLowerCase() === u.toLowerCase(); });
+        if (!c) return;
+        var text = 'Username: ' + c.username + '\nPassword: ' + c.password;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { App.showToast('Credentials copied', 'success'); })
+            .catch(function () { App.showToast(text, 'info'); });
+        } else App.showToast(text, 'info');
+      });
+    });
+  }
+  function initCreds() {
+    var gen = document.getElementById('genCredsBtn');
+    var copy = document.getElementById('copyCredsBtn');
+    var dl = document.getElementById('downloadCredsBtn');
+    if (gen) gen.addEventListener('click', function () {
+      var res = DataStore.ensureAllCredentials();
+      var out = document.getElementById('credGenResult');
+      if (res.created.length) {
+        out.textContent = 'Created ' + res.created.length + ' new login' + (res.created.length > 1 ? 's' : '') + ': ' +
+          res.created.map(function (c) { return c.name + ' (' + c.username + ')'; }).join(', ');
+        App.showToast('Generated ' + res.created.length + ' login' + (res.created.length > 1 ? 's' : ''), 'success');
+      } else {
+        out.textContent = 'Nothing to generate — every student already has a login.';
+        App.showToast('All students already have logins', 'info');
+      }
+      renderCreds();
+    });
+    if (copy) copy.addEventListener('click', function () {
+      var text = credCsv();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { App.showToast('All credentials copied', 'success'); })
+          .catch(function () { App.showToast('Copy blocked by the browser', 'error'); });
+      } else App.showToast('Copy not supported here', 'error');
+    });
+    if (dl) dl.addEventListener('click', function () {
+      var blob = new Blob([credCsv()], { type: 'text/csv' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'class-10a-logins.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      App.showToast('Downloaded logins CSV', 'success');
+    });
+    renderCreds();
   }
 
   /* ---------- user stats ---------- */
@@ -161,15 +300,29 @@
       var pages = Object.keys(s.pages).sort().map(function (p) { return p + '×' + s.pages[p]; }).join(', ');
       var cred = creds.find(function (c) { return c.username.toLowerCase() === u.toLowerCase(); });
       var pw = cred ? cred.password : '—';
-      return '<tr><td><strong>' + App.escapeHtml(s.name) + '</strong><div class="text-muted" style="font-size:.75rem">@' + App.escapeHtml(u) + '</div></td>' +
-        '<td>' + s.pageCount + '</td>' +
-        '<td class="user-pages">' + App.escapeHtml(pages) + '</td>' +
+      var acts = Object.keys(s.actions).filter(function (a) { return a !== 'visit'; })
+        .map(function (a) { return (ACTION_META[a] || { label: a }).label + '×' + s.actions[a]; }).join(', ');
+      /* newest first: what this student is doing right now */
+      var trail = (s.recent || []).slice(0, 5).map(function (r) {
+        return '<li><i class="fa-solid ' + actionIcon(r) + '"></i> ' +
+          App.escapeHtml(r.detail || ((ACTION_META[r.action] || ACTION_META.visit).label + (r.page ? ' ' + prettyPage(r.page) : ''))) +
+          ' <span class="text-muted">· ' + App.timeAgo(r.at) + '</span></li>';
+      }).join('');
+      return '<tr>' +
+        '<td><strong>' + App.escapeHtml(s.name) + '</strong>' +
+          (isAdminUser(u, s.name) ? ' <span class="admin-chip">ADMIN</span>' : '') +
+          '<div class="text-muted" style="font-size:.75rem">@' + App.escapeHtml(u) + '</div>' +
+          (trail ? '<ul class="user-trail">' + trail + '</ul>' : '') + '</td>' +
+        '<td>' + s.pageCount + '<div class="text-muted" style="font-size:.72rem">' + (s.chats || 0) + ' chat · ' + (s.ai || 0) + ' AI</div></td>' +
+        '<td class="user-pages">' + App.escapeHtml(pages || '—') + '</td>' +
+        '<td>' + (acts ? App.escapeHtml(acts) : '—') + '</td>' +
         '<td>' + App.timeAgo(s.lastSeen) + '</td>' +
         '<td><code style="font-size:.75rem">' + App.escapeHtml(pw) + '</code>' +
-        '<button class="btn btn-secondary btn-sm reset-pw" data-user="' + App.escapeHtml(u) + '" style="margin-left:6px"><i class="fa-solid fa-arrows-rotate"></i> Reset</button></td></tr>';
+        '<button class="btn btn-secondary btn-sm reset-pw" data-user="' + App.escapeHtml(u) + '" style="margin-left:6px" title="Reset password"><i class="fa-solid fa-arrows-rotate"></i></button>' +
+        '<button class="btn btn-secondary btn-sm copy-cred" data-user="' + App.escapeHtml(u) + '" style="margin-left:4px" title="Copy username &amp; password"><i class="fa-solid fa-copy"></i></button></td></tr>';
     }).join('');
 
-    el.innerHTML = '<table class="admin-table"><thead><tr><th>Student</th><th>Visits</th><th>Pages</th><th>Last seen</th><th>Password</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    el.innerHTML = '<table class="admin-table"><thead><tr><th>Student</th><th>Visits</th><th>Pages</th><th>Actions</th><th>Last seen</th><th>Password</th></tr></thead><tbody>' + rows + '</tbody></table>';
 
     el.querySelectorAll('.reset-pw').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -179,6 +332,18 @@
           App.showToast('Password reset → ' + newPw, 'success');
           renderUserStats();
         }
+      });
+    });
+    el.querySelectorAll('.copy-cred').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var u = btn.getAttribute('data-user');
+        var c = creds.find(function (x) { return x.username.toLowerCase() === u.toLowerCase(); });
+        if (!c) return;
+        var text = 'Username: ' + c.username + '\nPassword: ' + c.password;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () { App.showToast('Credentials copied', 'success'); })
+            .catch(function () { App.showToast(text, 'info'); });
+        } else App.showToast(text, 'info');
       });
     });
   }
@@ -557,14 +722,6 @@
     if (photoInput) photoInput.addEventListener('change', handlePhotoPick);
     var saveSubj = document.getElementById('saveSubjBtn');
     if (saveSubj) saveSubj.addEventListener('click', saveSubject);
-    var saveGithub = document.getElementById('saveGithubBtn');
-    if (saveGithub) saveGithub.addEventListener('click', function () {
-      var urlEl = document.getElementById('githubUrlInput');
-      var cfg = DataStore.getAiConfig();
-      cfg.githubUrl = urlEl.value.trim();
-      DataStore.setAiConfig(cfg);
-      App.showToast('GitHub URL saved. Check the Subjects page 🌐', 'success');
-    });
 
     var saveAi = document.getElementById('saveAiBtn');
     if (saveAi) saveAi.addEventListener('click', saveAiConfig);
@@ -584,7 +741,7 @@
       if (!confirm('Reset EVERYTHING back to seed data? This cannot be undone.')) return;
       DataStore.resetToSeed(false);
       loadSubjectFields(); renderSubjectsAdmin(); loadAiConfig();
-      loadDashboard(); renderActivity(); renderUserStats();
+      loadDashboard(); renderActivity(); renderUserStats(); renderCreds();
       App.showToast('All data reset to seed 🔄', 'success');
     });
 
@@ -661,7 +818,7 @@
     if (!DataStore.isAdminAuthed()) return;
     clearTimeout(syncT);
     syncT = setTimeout(function () {
-      loadDashboard(); renderActivity(); renderUserStats();
+      loadDashboard(); renderActivity(); renderUserStats(); renderCreds();
       renderHw(); renderScores(); renderAnn(); renderPolls();
     }, 400);
   };
@@ -678,6 +835,7 @@
     loadDashboard();
     renderActivity();
     renderUserStats();
+    initCreds();
     renderThemePicker();
   }
 

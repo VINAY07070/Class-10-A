@@ -176,6 +176,7 @@
         at: new Date().toISOString()
       });
       App.showToast('Shared ' + res.file.name, 'success');
+      try { DataStore.logAction('upload', 'Shared a file: ' + res.file.name, 'chat.html'); } catch (e) {}
       renderMessages(true);
     });
   }
@@ -207,6 +208,7 @@
       content: text,
       at: new Date().toISOString()
     });
+    try { DataStore.logAction('chat', 'Sent a chat message', 'chat.html'); } catch (e) {}
     inputEl.value = '';
     inputEl.focus();
     renderMessages(true);

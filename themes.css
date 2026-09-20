@@ -16,6 +16,7 @@
   --surface: rgba(255, 255, 255, 0.045);
   --surface-2: rgba(255, 255, 255, 0.07);
   --glass: rgba(255, 255, 255, 0.055);
+  --glass-opaque: #0d1428;
   --glass-strong: rgba(20, 28, 52, 0.72);
   --border: rgba(255, 255, 255, 0.09);
   --border-strong: rgba(255, 255, 255, 0.16);
@@ -53,6 +54,7 @@
   --surface: rgba(255, 215, 160, 0.05);
   --surface-2: rgba(255, 215, 160, 0.08);
   --glass: rgba(255, 215, 160, 0.06);
+  --glass-opaque: #1a1006;
   --glass-strong: rgba(18, 12, 8, 0.8);
   --border: rgba(255, 200, 140, 0.13);
   --border-strong: rgba(255, 200, 140, 0.26);
@@ -92,6 +94,7 @@
   --surface: rgba(255, 255, 255, 0.75);
   --surface-2: rgba(255, 255, 255, 0.9);
   --glass: rgba(255, 255, 255, 0.82);
+  --glass-opaque: #ffffff;
   --glass-strong: rgba(255, 255, 255, 0.95);
   --border: rgba(20, 30, 60, 0.1);
   --border-strong: rgba(20, 30, 60, 0.2);
@@ -136,6 +139,7 @@
   --surface: rgba(255, 255, 255, 0.038);
   --surface-2: rgba(255, 255, 255, 0.06);
   --glass: rgba(255, 255, 255, 0.045);
+  --glass-opaque: #080d24;
   --glass-strong: rgba(6, 13, 36, 0.78);
   --border: rgba(148, 197, 255, 0.1);
   --border-strong: rgba(148, 197, 255, 0.2);
@@ -174,6 +178,7 @@
   --surface: rgba(255, 255, 255, 0.04);
   --surface-2: rgba(255, 255, 255, 0.07);
   --glass: rgba(24, 15, 60, 0.5);
+  --glass-opaque: #100a24;
   --glass-strong: rgba(10, 5, 30, 0.8);
   --border: rgba(0, 255, 220, 0.14);
   --border-strong: rgba(0, 255, 220, 0.3);
@@ -213,6 +218,7 @@
   --surface: rgba(255, 190, 160, 0.05);
   --surface-2: rgba(255, 190, 160, 0.08);
   --glass: rgba(255, 170, 140, 0.055);
+  --glass-opaque: #22101a;
   --glass-strong: rgba(30, 12, 18, 0.78);
   --border: rgba(255, 170, 150, 0.12);
   --border-strong: rgba(255, 170, 150, 0.24);
@@ -251,6 +257,7 @@
   --surface: rgba(255, 255, 255, 0.04);
   --surface-2: rgba(255, 255, 255, 0.065);
   --glass: rgba(80, 220, 255, 0.05);
+  --glass-opaque: #061a2a;
   --glass-strong: rgba(6, 24, 38, 0.78);
   --border: rgba(120, 220, 255, 0.11);
   --border-strong: rgba(120, 220, 255, 0.22);
@@ -289,6 +296,7 @@
   --surface: rgba(255, 255, 255, 0.045);
   --surface-2: rgba(255, 255, 255, 0.07);
   --glass: rgba(160, 120, 255, 0.06);
+  --glass-opaque: #120a20;
   --glass-strong: rgba(18, 10, 32, 0.8);
   --border: rgba(190, 150, 255, 0.13);
   --border-strong: rgba(190, 150, 255, 0.26);

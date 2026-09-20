@@ -1117,6 +1117,39 @@ h1, h2, h3, h4 { line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
   border-radius: 100px;
   box-shadow: 0 0 14px rgba(245,181,68,.5);
 }
+.student-card.student-admin {
+  border-color: rgba(245,181,68,.5);
+  background: linear-gradient(180deg, rgba(245,181,68,.14), var(--glass));
+  box-shadow: var(--shadow-card), 0 0 26px rgba(245,181,68,.18);
+}
+.student-card.student-admin:hover, .student-card.student-admin:focus-visible {
+  border-color: rgba(245,181,68,.85);
+  box-shadow: var(--shadow-card), 0 0 34px rgba(245,181,68,.34);
+}
+.student-card.student-admin .student-avatar {
+  box-shadow: 0 6px 20px rgba(245,181,68,.5), 0 0 0 2px rgba(245,181,68,.6);
+}
+.student-card.student-founder {
+  border-color: rgba(124,108,255,.65);
+  background: linear-gradient(180deg, rgba(124,108,255,.18), var(--glass));
+  box-shadow: var(--shadow-card), 0 0 30px rgba(124,108,255,.26);
+}
+.student-card.student-founder::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg, rgba(124,108,255,.9), rgba(56,224,255,.7), rgba(124,108,255,.9));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: .8;
+}
+.student-card.student-founder .student-avatar {
+  box-shadow: 0 6px 20px rgba(124,108,255,.55), 0 0 0 2px rgba(124,108,255,.75);
+}
 .student-avatar {
   width: 58px; height: 58px;
   margin: 0 auto 12px;
@@ -2853,6 +2886,41 @@ h1, h2, h3, h4 { line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
 .admin-table th { color: var(--gold); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
 .admin-table tr:hover td { background: rgba(255,255,255,.03); }
 .user-pages { max-width: 260px; font-size: .76rem; color: var(--text-muted); }
+
+/* ---- per-user activity blocks (admin Activity tab) ---- */
+.activity-user-block {
+  background: rgba(255,255,255,.03); border: 1px solid var(--border);
+  border-radius: 14px; padding: 12px 14px;
+}
+.activity-user-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.activity-user-name { font-weight: 800; display: flex; align-items: center; gap: 7px; }
+.activity-user-name i { color: var(--accent); }
+.activity-user-sub { margin-left: auto; color: var(--text-muted); font-size: .74rem; display: flex; align-items: center; gap: 6px; }
+.admin-chip {
+  background: var(--grad-gold); color: #231303; font-weight: 900;
+  font-size: .6rem; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px;
+}
+.activity-user-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.activity-user-items li { display: flex; align-items: center; gap: 9px; font-size: .8rem; }
+.activity-user-items li > i { color: var(--gold); width: 16px; text-align: center; font-size: .78rem; }
+.act-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-time { color: var(--text-muted); font-size: .72rem; white-space: nowrap; }
+.user-trail { list-style: none; margin: 7px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.user-trail li { font-size: .74rem; display: flex; align-items: center; gap: 7px; }
+.user-trail li > i { color: var(--gold); font-size: .7rem; width: 14px; text-align: center; }
+
+/* ---- student login credentials (admin Users tab) ---- */
+.cred-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.cred-warn, .cred-ok {
+  display: flex; align-items: center; gap: 9px; font-size: .84rem;
+  border-radius: 11px; padding: 10px 14px; margin-bottom: 12px;
+}
+.cred-warn { background: rgba(245,181,68,.12); border: 1px solid rgba(245,181,68,.4); color: var(--gold-2); }
+.cred-ok { background: rgba(52,211,153,.1); border: 1px solid rgba(52,211,153,.35); color: #7ff0c4; }
+.admin-table code { background: rgba(255,255,255,.07); padding: 2px 7px; border-radius: 6px; font-size: .78rem; }
 .admin-list-title { margin: 18px 0 12px; color: var(--gold); }
 .admin-item {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -3268,4 +3336,127 @@ body.page-leaving { opacity: 0; transition: opacity .18s ease; }
   .scores-table-wrap, .glass-card, .analytics-card { background: #fff; border: 1px solid #ccc; box-shadow: none; backdrop-filter: none; }
   .scores-table td, .scores-table th { color: #111; border-color: #ddd; }
   .page-header { padding: 10px 0; }
+}
+
+/* ============================================================
+   PERF-LITE — phones & low-end devices
+   ------------------------------------------------------------
+   perf.js adds .perf-lite to <html> on touch/low-core/small
+   screens. Until now nothing consumed it, so phones were still
+   compositing ~46 backdrop-filter blurs and dozens of infinite
+   keyframe animations every frame. That is what made the site
+   laggy. Here each expensive effect becomes a cheap solid or
+   static equivalent that looks the same at a glance.
+   ============================================================ */
+html.perf-lite *,
+html.perf-lite *::before,
+html.perf-lite *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* glass panels fall back to an opaque surface — same look, no blur.
+   --glass-opaque is a per-theme solid equivalent of --glass. */
+html.perf-lite .glass-card,
+html.perf-lite .glass,
+html.perf-lite .navbar,
+html.perf-lite .card,
+html.perf-lite .panel,
+html.perf-lite .sync-content {
+  background: var(--glass-opaque, #0d1428) !important;
+}
+html.perf-lite .mobile-drawer,
+html.perf-lite .modal-content,
+html.perf-lite .toast {
+  background: rgba(16,22,44,.98) !important;
+}
+
+/* decorative blur orbs cost a full-screen composite each frame */
+html.perf-lite .hero-aurora,
+html.perf-lite .bg-blob,
+html.perf-lite .hero-orb,
+html.perf-lite .aurora-blob,
+html.perf-lite .particle-blob,
+html.perf-lite .gate-orb,
+html.perf-lite .blob { display: none !important; }
+html.perf-lite body::before,
+html.perf-lite body::after { display: none !important; }
+html.perf-lite #heroCanvas,
+html.perf-lite #loginCanvas,
+html.perf-lite .particle-canvas { display: none !important; }
+
+/* freeze continuous/decorative animations (they repaint forever) */
+html.perf-lite .pulse-dot,
+html.perf-lite .p2p-dot,
+html.perf-lite .caret,
+html.perf-lite .typing i,
+html.perf-lite .empty-icon,
+html.perf-lite .maker,
+html.perf-lite .thumbs,
+html.perf-lite .mascot-svg .mascot-root,
+html.perf-lite .lock-icon,
+html.perf-lite .scroll-mouse,
+html.perf-lite .marquee-track,
+html.perf-lite .glass-card::before,
+html.perf-lite .feature-card::before { animation: none !important; }
+
+/* no blur filters on the mascots either */
+html.perf-lite .stickman:hover .sm-svg,
+html.perf-lite .stickman.grabbed .sm-svg,
+html.perf-lite .sm-svg { filter: none !important; }
+html.perf-lite .sm-bubble { background: rgba(16,22,44,.98) !important; }
+html.perf-lite .sm-tag { background: rgba(13,18,36,.92) !important; }
+
+/* cheaper chrome on the big painted surfaces */
+html.perf-lite .navbar { box-shadow: 0 1px 0 var(--border); }
+html.perf-lite .glass-card { box-shadow: none; }
+html.perf-lite .reveal,
+html.perf-lite [data-reveal],
+html.perf-lite [data-stagger] > * {
+  transition: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* ============================================================
+   PERF-QUIET — desktop / large-screen tier.
+
+   A machine that is not "lite" still pays for every backdrop-filter
+   surface it composites, and pages here carry 40+. The blur reads
+   nearly identical on a 14px card and an 18px nav bar, but the count
+   is what costs. This tier keeps the blur on the surfaces where it is
+   actually visible as glass (the chrome that floats over content and
+   the hero cards) and flattens the long tail of small controls, which
+   at their size look the same either way. ~40 blurred elements -> ~12.
+
+   perf.js only adds this when the device is not lite and reports
+   enough cores to be worth it; the adaptive governor can also add it
+   at runtime if it measures jank.
+   ============================================================ */
+html.perf-quiet .btn,
+html.perf-quiet label.btn,
+html.perf-quiet .strip-cell,
+html.perf-quiet .teacher-mini-card,
+html.perf-quiet .sm-tag,
+html.perf-quiet .sm-bubble,
+html.perf-quiet .hero-eyebrow,
+html.perf-quiet .make-post,
+html.perf-quiet .composer,
+html.perf-quiet .filters,
+html.perf-quiet .pill,
+html.perf-quiet .badge,
+html.perf-quiet .toast {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html.perf-quiet .btn,
+html.perf-quiet label.btn,
+html.perf-quiet .pill,
+html.perf-quiet .badge {
+  background-image: none;
+}
+html.perf-quiet .strip-cell,
+html.perf-quiet .teacher-mini-card,
+html.perf-quiet .sm-tag,
+html.perf-quiet .sm-bubble {
+  background-color: var(--glass-opaque, #0d1428);
 }
