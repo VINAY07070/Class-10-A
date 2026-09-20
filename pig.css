@@ -1,0 +1,83 @@
+/* ============================================================
+   PIG.CSS — Parameshwar, the small wandering class pig.
+
+   Transform-only positioning so the browser never has to reflow
+   the page while he walks. He sits below the stickmen in z-order
+   and is pointer-events:auto only on his own box, so he never
+   steals clicks from the page underneath.
+   ============================================================ */
+.pig-parameshwar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 46px;
+  height: 34px;
+  z-index: 9997;                 /* under the stickmen (9998) */
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+  will-change: transform;
+  contain: layout style;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.pig-parameshwar.grabbed { cursor: grabbing; }
+.pig-parameshwar .pig-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .38));
+}
+.pig-parameshwar.grabbed .pig-svg { filter: drop-shadow(0 7px 11px rgba(0, 0, 0, .5)); }
+.pig-parameshwar:hover .pig-svg { filter: drop-shadow(0 0 7px rgba(255, 176, 200, .5)); }
+
+/* speech bubble — sits above and slightly ahead of his head */
+.pig-bubble {
+  position: absolute;
+  left: 62%;
+  bottom: calc(100% + 5px);
+  transform: translateX(-30%) scale(.7);
+  transform-origin: 30% 100%;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(13, 18, 36, .94);
+  border: 1px solid rgba(255, 176, 200, .4);
+  color: #ffd9e5;
+  font: 600 10.5px/1.25 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s cubic-bezier(.2, 1.5, .4, 1);
+}
+.pig-bubble::after {
+  content: '';
+  position: absolute;
+  left: 26%;
+  top: 100%;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-top-color: rgba(13, 18, 36, .94);
+}
+.pig-bubble.show { opacity: 1; transform: translateX(-30%) scale(1); }
+
+/* the pig is decoration; hidden states come from the shared toggle */
+body.stickmen-hidden .pig-parameshwar { display: none; }
+
+/* phones: smaller, and flattened onto the bottom bar */
+@media (max-width: 620px) {
+  .pig-parameshwar { width: 38px; height: 28px; }
+  .pig-bubble { font-size: 9.5px; padding: 2px 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pig-parameshwar { display: none; }
+}
+
+/* no glow-filter on weak devices — a filter on a moving element forces
+   a repaint of its whole layer every frame */
+html.perf-lite .pig-parameshwar .pig-svg,
+html.perf-lite .pig-parameshwar:hover .pig-svg,
+html.perf-lite .pig-parameshwar.grabbed .pig-svg { filter: none; }
+html.perf-quiet .pig-parameshwar .pig-svg { filter: none; }

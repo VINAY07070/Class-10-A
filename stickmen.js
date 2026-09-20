@@ -69,7 +69,13 @@
 
   /* ---------------- geometry / world ---------------- */
   var GY = 158, CX = 60;                 // ground Y / center X in SVG units
-  var HIP = { x: 60, y: 112 }, CHEST = { x: 60, y: 78 }, HEAD = { x: 60, y: 50 }, HEAD_R = 13.5;
+  /* Classic stick-figure proportions, all in one place. Ground 158, hip 112,
+     spine top 78, shoulders 84, head centre 60 with r=14. So the head's
+     bottom edge lands at 74, only 4 units above the spine top. That short
+     neck is what makes it read as a stickman. The old geometry put the head
+     centre at 50 and drew an 18.5-unit neck, over half the 34-unit torso,
+     which made the figure look like a lollipop rather than a stick figure. */
+  var HIP = { x: 60, y: 112 }, CHEST = { x: 60, y: 78 }, HEAD = { x: 60, y: 60 }, HEAD_R = 14;
   var SH = { x: 60, y: 84 };               // shoulder point
   var HAND_L = { x: 43, y: 110 }, HAND_R = { x: 77, y: 110 };
   var FOOT_L = { x: 51, y: GY }, FOOT_R = { x: 69, y: GY };
@@ -123,13 +129,13 @@
     /* head — a plain circle. No hair ribbon, no headband, no glasses:
        those details read as a character with a hairstyle rather than a
        universal "stickman", which is what the class asked us to fix. */
-    s += '<line class="p-neck" x1="60" y1="78" x2="60" y2="72" stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round"/>';
+    s += '<line class="p-neck" x1="60" y1="78" x2="60" y2="74" stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round"/>';
     s += '<g class="p-headG">';
-    s += '<circle class="p-head" cx="60" cy="46" r="' + HEAD_R + '" fill="none" stroke="' + ink + '" stroke-width="' + w + '"/>';
-    s += '<circle class="p-pupL" cx="55" cy="45.5" r="1.5" fill="' + ink + '"/>';
-    s += '<circle class="p-pupR" cx="65" cy="45.5" r="1.5" fill="' + ink + '"/>';
-    s += '<path class="p-mouth" d="M55 53 Q60 56.5 65 53" stroke="' + ink + '" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".85"/>';
-    s += '<ellipse class="p-mouthOpen" cx="60" cy="54.5" rx="2.4" ry="3" fill="' + ink + '" opacity="0"/>';
+    s += '<circle class="p-head" cx="60" cy="60" r="' + HEAD_R + '" fill="none" stroke="' + ink + '" stroke-width="' + w + '"/>';
+    s += '<circle class="p-pupL" cx="54.5" cy="59.5" r="1.6" fill="' + ink + '"/>';
+    s += '<circle class="p-pupR" cx="65.5" cy="59.5" r="1.6" fill="' + ink + '"/>';
+    s += '<path class="p-mouth" d="M54 68 Q60 71.5 66 68" stroke="' + ink + '" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".85"/>';
+    s += '<ellipse class="p-mouthOpen" cx="60" cy="69.5" rx="2.4" ry="3" fill="' + ink + '" opacity="0"/>';
     s += '</g>'; /* headG */
     s += '</g></g></svg>';
     return s;
@@ -867,11 +873,11 @@
 
     /* head group: position + tilt */
     var tiltDeg = (F.headTilt * 57.3).toFixed(1);
-    E.headG.setAttribute('transform', 'translate(' + (hx.x - HEAD.x).toFixed(1) + ' ' + (hx.y - HEAD.y).toFixed(1) + ') rotate(' + tiltDeg + ' 60 46)');
+    E.headG.setAttribute('transform', 'translate(' + (hx.x - HEAD.x).toFixed(1) + ' ' + (hx.y - HEAD.y).toFixed(1) + ') rotate(' + tiltDeg + ' 60 60)');
     /* Neck is drawn in root coordinates from the live shoulder/chest anchor to
        the head's bottom edge, so springy head lag never detaches it. */
     if (E.neck) {
-      var neckTopY = hx.y + 13.5;             /* head's bottom edge */
+      var neckTopY = hx.y + HEAD_R;           /* head's bottom edge */
       var neckBotY = F.chest.y + 2;           /* chest anchor, always lower */
       if (neckBotY - neckTopY < 2) neckBotY = neckTopY + 2;
       setL(E.neck, F.chest.x, neckBotY, hx.x, neckTopY);
