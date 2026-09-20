@@ -32,12 +32,14 @@
 .pig-premeshwar.grabbed .pig-svg { filter: drop-shadow(0 7px 11px rgba(0, 0, 0, .5)); }
 .pig-premeshwar:hover .pig-svg { filter: drop-shadow(0 0 7px rgba(255, 176, 200, .5)); }
 
-/* nameplate — makes it unambiguous that he is Premeshwar, not just a pig */
+/* Nameplate. Hidden by default — the pig is a wanderer, not a banner, so
+   the label only surfaces occasionally (see flashTag in pig.js) rather than
+   hovering over every page view. */
 .pig-tag {
   position: absolute;
   left: 50%;
   top: -20px;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(4px) scale(.86);
   font: 800 9px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   letter-spacing: .11em;
   text-transform: uppercase;
@@ -48,10 +50,15 @@
   border-radius: 999px;
   white-space: nowrap;
   pointer-events: none;
-  opacity: .95;
-  transition: opacity .2s ease;
+  opacity: 0;
+  transition: opacity .35s ease, transform .35s cubic-bezier(.34, 1.4, .5, 1);
 }
-.pig-premeshwar:hover .pig-tag { opacity: 1; }
+.pig-tag.show { opacity: .95; transform: translateX(-50%) translateY(0) scale(1); }
+.pig-premeshwar:hover .pig-tag { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+.pig-premeshwar.grabbed .pig-tag { opacity: 0; }
+/* Never let the plate collide with the speech bubble: while he is talking,
+   the name steps aside. */
+.pig-premeshwar.talking .pig-tag { opacity: 0; transform: translateX(-50%) translateY(6px) scale(.85); }
 /* Accent the two stickman nameplates to match their ink. Lives here because
    pig.css is the last of the mascot sheets to load, so these win cleanly. */
 .sm-vinay .sm-tag { border-color: rgba(168, 155, 255, .55); box-shadow: 0 0 12px rgba(168, 155, 255, .22); }
@@ -106,3 +113,51 @@ html.perf-lite .pig-premeshwar .pig-svg,
 html.perf-lite .pig-premeshwar:hover .pig-svg,
 html.perf-lite .pig-premeshwar.grabbed .pig-svg { filter: none; }
 html.perf-quiet .pig-premeshwar .pig-svg { filter: none; }
+/* The SVG carries the facing (scaleX on .pig-svg from applyFlip), so it
+   needs its own transform box. */
+.pig-svg { display: block; width: 100%; height: auto; overflow: visible; transform-origin: center center; }
+
+/* ---------------- throw FX layer ---------------- */
+/* Puffs, comic stars and impact rings spawned when Premeshwar is thrown.
+   One fixed, pointer-events:none container outside the pig so a landing
+   burst is not clipped by his own small box. */
+.pig-fx {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 9996;
+}
+.pig-puff {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, .55), rgba(255, 176, 200, .12) 62%, transparent 72%);
+  will-change: transform, opacity;
+}
+.pig-puff.star { background: none; width: 16px; height: 16px; margin: -8px 0 0 -8px; }
+.pig-puff.star::before {
+  content: '★';
+  display: block;
+  font-size: 15px;
+  line-height: 16px;
+  text-align: center;
+  color: #ffd889;
+  text-shadow: 0 0 8px rgba(255, 216, 137, .75);
+}
+.pig-puff.ring {
+  width: 40px; height: 40px;
+  margin: -20px 0 0 -20px;
+  background: none;
+  border: 2px solid rgba(255, 176, 200, .7);
+}
+@keyframes pigPuffFly {
+  to { transform: translate(var(--dx), var(--dy)) scale(var(--s, .3)); opacity: 0; }
+}
+@keyframes pigRing {
+  0%   { transform: scale(.35); opacity: .85; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+html.perf-lite .pig-puff.star::before { text-shadow: none; }

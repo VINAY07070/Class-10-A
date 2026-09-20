@@ -49,6 +49,26 @@ must be registered in `SYNC_DEFS` in `sync-bridge.js` **and** mapped in
 - The free relay rate-limits aggressively (HTTP 429). `es.onerror` uses
   exponential backoff; do not shorten it.
 
+### The catch-up cursor (easy to break)
+
+A device opening *after* someone wrote must replay the room history, or it
+silently never sees that data. Two rules keep this working:
+
+1. `bootSince` is captured at module load, before the SSE stream can touch
+   `lastTime`, and `handleNtfyEvent` must not call `markSeen` until
+   `catchupDone`. Otherwise the live echo of our own presence moves the
+   cursor to "now" and the replay asks for nothing.
+2. The first catch-up replays `CATCHUP_WINDOW`; later page loads only fetch
+   since `lastTime`. `AiaRelay.resync()` forces a full replay.
+
+Catch-up fetches **one** relay and stops on a non-empty body. It used to
+fetch all three in parallel, downloading the whole room three times over.
+`ingest()` also parses in ~8 ms slices with `setTimeout` yields, and skips
+`HISTORY_SKIP` keys (`al`, `pr`) — presence/activity heartbeats were ~97% of
+the 850 KB history and are useless when stale (fresh ones arrive live).
+Measured with the relay off vs on, long tasks on first load are identical,
+so the sync path costs no main-thread time.
+
 ## Performance
 
 `perf.js` adds `perf-lite` on constrained devices; `perf.css` holds the

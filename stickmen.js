@@ -1133,6 +1133,17 @@
     var totalSpin = (F.spin || 0) + (F.extraSpin || 0);
     var rot = totalSpin ? ' rotate(' + (totalSpin * 57.3).toFixed(1) + 'deg)' : '';
     F.el.style.transform = 'translate3d(' + F.x.toFixed(1) + 'px,' + (F.y + F.yOff).toFixed(1) + 'px,0)' + rot;
+
+    /* Facing. The figure is drawn and posed in a canonical right-facing
+       space, so turning around is a mirror of the SVG alone. Applying it
+       here rather than on F.el is what keeps the nameplate and the speech
+       bubble readable — mirroring the wrapper would flip the text too,
+       which is exactly the bug the pig had. */
+    var flip = F.dir >= 0 ? 1 : -1;
+    if (flip !== F._flip) {
+      F._flip = flip;
+      F.svg.style.transform = flip === 1 ? '' : 'scaleX(-1)';
+    }
   }
 
   var lastFrameAt = 0;
@@ -1250,6 +1261,9 @@
     greet: greet,
     react: reactTo,
     interest: interest,
+    /* Send a mascot to an absolute x position. Exposed mainly so the
+       facing logic is testable without waiting on the random scheduler. */
+    walk: function (k, x) { return startWalk(k, x); },
     /* Trigger a named activity on one mascot (or either, by name).
        Used by the page to celebrate real events, and by tests. */
     act: function (name, k) {
@@ -1281,7 +1295,7 @@
       var out = {};
       Object.keys(figures).forEach(function (k) {
         var F = figures[k];
-        out[k] = { mode: F.mode, x: Math.round(F.x), yOff: Math.round(F.yOff), dragging: !!F.dragging };
+        out[k] = { mode: F.mode, x: Math.round(F.x), yOff: Math.round(F.yOff), dragging: !!F.dragging, dir: F.dir, facing: F.dir >= 0 ? 'right' : 'left' };
       });
       return out;
     }

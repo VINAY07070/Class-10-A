@@ -76,7 +76,14 @@
   var seen = {}, lastTime = 0, status = enabled ? 'starting' : 'off';
   var es = null, dirty = {}, pushTimer = 0, pollTimer = 0, reconnectTimer = 0, sseFails = 0;
   var lastPublishKey = {}, publishedChatIds = {};
+  /* Catch-up cursor. Captured at module load, before the live stream can
+     touch lastTime, so the first sync really does replay recent history. */
+  var bootSince = 0, catchupDone = false;
   try { lastTime = Number(localStorage.getItem(LAST_SEEN_KEY) || 0) || 0; } catch (e) {}
+  bootSince = lastTime || CATCHUP_WINDOW;
+  /* A device that already synced recently does not need the whole window
+     again on every page load — only a fresh device does. */
+  catchupDone = !!lastTime;
   function markSeen(t) {
     if (!t) return;
     lastTime = Math.max(lastTime, t);
@@ -228,7 +235,10 @@
     var data;
     try { data = JSON.parse(ev.data); } catch (e) { return; }
     if (!data || data.event !== 'message' || !data.message) return;
-    markSeen(data.time);
+    /* Do not let live traffic move the catch-up cursor forward before the
+       first history replay has run — that is what made a device which opened
+       after a write skip it entirely. */
+    if (catchupDone) markSeen(data.time);
     var msg;
     try { msg = JSON.parse(data.message); } catch (e) { return; }
     applyMessage(msg, data.id);
@@ -264,6 +274,9 @@
       sseFails = 0;
       setStatus('live');
       setPolling(30000);                  /* SSE healthy → occasional safety poll */
+      /* Reconcile anything we missed while the stream was down (or, on a
+         first load, whatever was already in the room). */
+      catchUp();
     };
     es.onmessage = function (ev) { handleNtfyEvent(ev); };
     es.onerror = function () {
@@ -282,45 +295,104 @@
   function closeStream() { try { if (es) es.close(); } catch (e) {} es = null; }
 
   /* -------- fallback polling --------
-     Reads from EVERY relay (not just the active one) so a device that
-     published to a backup server is still heard. Backoff keeps us under
-     the free-tier rate limits. */
+     One request at a time. The old code fired a GET at every relay in
+     parallel, so a fresh device pulled the whole history three times over
+     — megabytes of JSON parsed on the main thread, which is exactly what
+     made the first load feel laggy on a phone. The backup relays are now
+     only tried when the primary returns nothing. */
   var catchingUp = false;
-  function ingest(text) {
-    text.split('\n').forEach(function (line) {
-      line = line.trim();
-      if (!line) return;
-      var d;
-      try { d = JSON.parse(line); } catch (e) { return; }
-      if (!d || d.event !== 'message' || !d.message) return;
-      if (d.id && seen[d.id]) return;
-      markSeen(d.time);
-      var msg;
-      try { msg = JSON.parse(d.message); } catch (e) { return; }
-      applyMessage(msg, d.id);
-    });
+
+  /* Keys that are live signals rather than durable data: presence
+     heartbeats and the activity feed. A device that opens later gets fresh
+     ones over the live stream within seconds, so replaying hundreds of stale
+     copies is pure cost. They made up ~97% of the room history (830 KB of
+     presence/activity noise), and parsing that on the main thread was what
+     actually made a first load feel laggy on a phone. */
+  var HISTORY_SKIP = { al: 1, pr: 1 };
+
+  /* Parse one relay line into an applied message. `live` marks traffic that
+     arrived over the stream, as opposed to a history replay. */
+  function ingestLine(line, live) {
+    line = line.trim();
+    if (!line) return false;
+    var d;
+    try { d = JSON.parse(line); } catch (e) { return false; }
+    if (!d || d.event !== 'message' || !d.message) return false;
+    if (d.id && seen[d.id]) return false;
+    markSeen(d.time);
+    var msg;
+    try { msg = JSON.parse(d.message); } catch (e) { return false; }
+    if (!live && msg && msg.d) {
+      var keep = false;
+      Object.keys(msg.d).forEach(function (k) {
+        if (HISTORY_SKIP[k]) delete msg.d[k]; else keep = true;
+      });
+      if (!keep) return false;
+    }
+    applyMessage(msg, d.id);
+    return true;
   }
-  function catchUp() {
+
+  /* The relay can hand back hundreds of KB of history. Parsing all of it in
+     one go blocks the main thread for hundreds of ms on a phone — which is
+     what "laggy" actually was. Process in small batches and yield between
+     them so frames keep flowing. */
+  function ingest(text, done) {
+    var lines = text ? text.split('\n') : [];
+    var i = 0, got = false, sliceStart = performance.now();
+    function pump() {
+      var n = 0;
+      while (i < lines.length && n < 30) {
+        if (ingestLine(lines[i], false)) got = true;
+        i++; n++;
+        if (performance.now() - sliceStart > 8) break;  /* keep frames smooth */
+      }
+      sliceStart = performance.now();
+      if (i < lines.length) setTimeout(pump, 0);
+      else done(got);
+    }
+    pump();
+  }
+  /* `cursor` is the "since" value this catch-up must use. It is captured
+     once at boot (see CATCHUP_SINCE) because the SSE stream can advance
+     lastTime within milliseconds of connecting — before this catch-up runs —
+     which would make us ask for "everything since a moment ago" and silently
+     skip the whole history. A device opening for the first time must see
+     what is already in the room. */
+  function catchUp(force) {
     if (!enabled || catchingUp) return;
     catchingUp = true;
-    var since = lastTime ? lastTime : CATCHUP_WINDOW;
-    var pending = SERVERS.length, rateLimited = false;
-    SERVERS.forEach(function (srv) {
-      fetch(srv + '/' + room + '/json?poll=1&since=' + since, { cache: 'no-store' })
+    var since = (force || !catchupDone)
+      ? (bootSince || CATCHUP_WINDOW)
+      : (lastTime || CATCHUP_WINDOW);
+    catchupDone = true;
+
+    function tryServer(i, sawAny) {
+      if (i >= SERVERS.length) {
+        catchingUp = false;
+        if (!sawAny && rateLimited) {
+          setPolling(Math.min((pollEvery || 5000) * 2, 60000));
+        }
+        return;
+      }
+      fetch(SERVERS[i] + '/' + room + '/json?poll=1&since=' + since,
+            { cache: 'no-store' })
         .then(function (r) {
-          if (r.status === 429 || r.status >= 500) { rateLimited = true; return ''; }
-          if (!r.ok) return '';
+          if (r.status === 429 || r.status >= 500) { rateLimited = true; return null; }
+          if (!r.ok) return null;
           return r.text();
         })
-        .then(function (text) { if (text) ingest(text); })
-        .catch(function () {})
-        .then(function () {
-          if (--pending === 0) {
-            catchingUp = false;
-            if (rateLimited) setPolling(Math.min((pollEvery || 5000) * 2, 60000));
-          }
-        });
-    });
+        .then(function (text) {
+          /* A non-empty body means this relay is healthy and has the room.
+             Stop here — the backups mirror the same room, so fetching them
+             as well would only repeat hundreds of KB we already processed. */
+          if (!text || !text.length) { tryServer(i + 1, sawAny); return; }
+          ingest(text, function () { catchingUp = false; });
+        })
+        .catch(function () { tryServer(i + 1, sawAny); });
+    }
+    var rateLimited = false;
+    tryServer(0, false);
   }
 
   /* -------- local change → publish -------- */
@@ -342,7 +414,7 @@
       setStatus('starting');
       connect();
       setPolling(5000);                   /* reliable poll until SSE is healthy */
-      setTimeout(catchUp, 400);           /* immediate catch-up of recent history */
+      setTimeout(function () { catchUp(); }, 400);   /* replay history as early as possible */
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
@@ -358,11 +430,14 @@
       if (!r) return false;
       room = r; saveSettings();
       lastTime = 0; seen = {};
+      /* a new room is a fresh history: force a full catch-up again */
+      bootSince = CATCHUP_WINDOW; catchupDone = false;
       try { localStorage.removeItem(LAST_SEEN_KEY); } catch (e) {}
       closeStream();
       setStatus('starting', 'Room changed — reconnecting');
       connect();
       setPolling(8000);
+      catchUp(true);
       return true;
     },
     setEnabled: function (on) {
@@ -373,6 +448,13 @@
     },
     isEnabled: function () { return enabled; },
     statusHTML: function () { return statusHTML(status === 'live' ? '' : 'Sync codes still work even without the live link.'); },
-    refresh: function () { catchingUp = false; catchUp(); }
+    refresh: function () { catchingUp = false; catchUp(false); },
+    /* Force a full-history replay (used by the Sync Center "re-sync" action). */
+    resync: function () {
+      catchingUp = false; bootSince = CATCHUP_WINDOW; catchupDone = false;
+      try { localStorage.removeItem(LAST_SEEN_KEY); } catch (e) {}
+      lastTime = 0; seen = {};
+      catchUp(true);
+    }
   };
 })();
