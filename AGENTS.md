@@ -75,3 +75,46 @@ python3 -m http.server 12000
 Stickmen mascots should read as classic stick figures: open stance, line limbs,
 outlined hoop head. Avoid trailing strokes off the headband — they read as a
 ponytail and make the mascot look feminine.
+
+## Mascots
+
+Vinay and Nitin are the two stickmen (`stickmen.js`, v5). The pig is
+**Premeshwar** (`pig.js`) and his nameplate is the `.pig-tag` element — keep
+the spelling exactly "Premeshwar".
+
+Adding a new mascot activity means four edits in `stickmen.js`, not one:
+
+1. a `do<Name>(F, ms)` wrapper using `gesture(F, '<name>', ms)`
+2. a pose branch in `renderFigure` for `F.mode === '<name>'`
+3. the mode name in the long timer branch in `updateFigure` that clears the
+   mode when `p >= 1`
+4. a slot in the `schedule()` ladder (`r < 0.xx`) and optionally in the
+   `StickMen.act` public API
+
+`startFight()` is the only multi-figure activity; it chains `walkTo` callbacks
+and `fightBlow` exchanges. It is rate-limited by `fightCd`.
+
+## Presentation layers
+
+Load order matters. `css/style.css` is an `@import` shim loaded by every
+subpage; `style.css` (root) is the base sheet. The shim order is
+base → mobile → perf → pig → extras → polish → signature, and the same
+sequence for JS in `js/main.js`. `signature.css`/`signature.js` are last on
+purpose: that is what lets the signature rules win specificity fights without
+`!important`.
+
+The signature layer adds identity from the existing DOM and must stay
+additive: no page markup should depend on it. `Signature.init()` is
+idempotent and re-runs on a MutationObserver, so it survives pages that
+re-render after login.
+
+Do not use `body::before` / `body::after` for new decoration — both are
+already taken by the base theme and `polish.css`. Use a real element (see
+`.sig-wash`).
+
+## Phone performance
+
+`perf.js` sets `html.perf-lite` on phones and low-power devices. Keep all
+new animation gated behind it: `html.perf-lite .thing { animation: none; }`
+or an early return in JS (`P.lite`). The phone target is 60fps on every page
+and no horizontal overflow.

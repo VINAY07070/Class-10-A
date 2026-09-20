@@ -1,0 +1,364 @@
+/* ============================================================
+   SIGNATURE.CSS — the visual identity of the 10-A hub.
+
+   Before this sheet the site was a good dark-glass theme, but it
+   looked like every other dark-glass theme: same card, same
+   gradient text, same layout rhythm. This is the layer that makes
+   it unmistakably *this* class.
+
+   The identity rests on four repeatable motifs:
+     1. the crest        — an "X-A" monogram used as the mark
+     2. the 10-A rule    — a numbered hairline that labels sections
+     3. the rail         — a right-hand scroll rail with section dots
+     4. the wash         — a faint graph-paper grid behind the page
+
+   Everything is additive. Nothing here changes layout, and the
+   heavier motifs switch off on phones and reduced motion.
+   ============================================================ */
+
+/* ---------------- 1. design tokens ---------------- */
+:root {
+  /* The site's own accent ramp, distinct from the generic
+     indigo/cyan pairing: ink violet → chalk gold → slate teal. */
+  --sig-ink: #a89bff;
+  --sig-gold: #f5b544;
+  --sig-teal: #5eead4;
+  --sig-rose: #ff8fb1;
+  --sig-rule: rgba(168, 155, 255, .22);
+
+  /* A tighter, more editorial heading voice than the body font. */
+  --sig-display: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ---------------- 2. the crest ---------------- */
+.sig-crest {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+}
+.sig-crest svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.sig-crest .crest-ring {
+  transform-origin: 50% 50%;
+  animation: sigRingSpin 26s linear infinite;
+}
+@keyframes sigRingSpin { to { transform: rotate(360deg); } }
+.sig-crest .crest-mono {
+  font-family: var(--sig-display);
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: -.04em;
+  fill: #fff;
+}
+.sig-crest .crest-x { fill: var(--sig-gold); }
+
+/* crest used in the navbar brand */
+.navbar-brand .sig-crest { width: 38px; height: 38px; }
+.navbar-brand .sig-crest .crest-mono { font-size: 13px; }
+
+/* ---------------- 3. the 10-A rule on section heads ---------------- */
+section.section { position: relative; }
+
+.sig-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  font-family: var(--sig-display);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .42);
+}
+.sig-rule-num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(168, 155, 255, .2), rgba(245, 181, 68, .16));
+  border: 1px solid var(--sig-rule);
+  color: var(--sig-ink);
+  letter-spacing: .08em;
+}
+.sig-rule-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--sig-rule), transparent);
+  max-width: 420px;
+}
+
+/* ---------------- 4. the right-hand scroll rail ---------------- */
+.sig-rail {
+  position: fixed;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 8px;
+  border-radius: 999px;
+  background: rgba(10, 14, 28, .5);
+  border: 1px solid rgba(255, 255, 255, .07);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .4s ease;
+}
+.sig-rail.on { opacity: 1; pointer-events: auto; }
+.sig-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, .3);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform .25s cubic-bezier(.34, 1.56, .64, 1), background .25s, border-color .25s;
+  position: relative;
+}
+.sig-dot:hover { transform: scale(1.45); border-color: var(--sig-gold); }
+.sig-dot.active {
+  background: var(--sig-gold);
+  border-color: var(--sig-gold);
+  transform: scale(1.5);
+  box-shadow: 0 0 10px rgba(245, 181, 68, .65);
+}
+/* tooltip label on hover */
+.sig-dot::after {
+  content: attr(data-label);
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(12, 17, 34, .95);
+  border: 1px solid rgba(255, 255, 255, .14);
+  padding: 5px 9px;
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.sig-dot:hover::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+
+/* ---------------- 5. graph-paper wash ---------------- */
+/* A real element rather than a body pseudo-element, because the theme
+   already uses both of those for its own background layers. */
+.sig-wash {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(168, 155, 255, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 155, 255, .05) 1px, transparent 1px);
+  background-size: 62px 62px;
+  mask-image: radial-gradient(120% 90% at 50% 0%, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 0%, #000 20%, transparent 78%);
+}
+html.perf-lite .sig-wash { background-size: 84px 84px; opacity: .55; }
+
+/* ---------------- 6. heading treatment ---------------- */
+.heading-lg, .heading-md, .hero-title {
+  font-family: var(--sig-display);
+  letter-spacing: -.022em;
+}
+/* a chalk underline that draws itself when the heading scrolls in */
+.sig-underline {
+  display: block;
+  height: 3px;
+  width: 0;
+  margin-top: 10px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sig-gold), var(--sig-ink) 55%, transparent);
+  transition: width .9s cubic-bezier(.2, .8, .2, 1);
+}
+.in .sig-underline, .visible .sig-underline { width: 84px; }
+
+/* The gradient wordmark gets a slow travelling highlight, so the
+   busiest text on the page is also the most alive. Note: .grad-text had
+   no base style anywhere in the original sheets (only .line-glow did),
+   so the highlighted words were rendering as plain text. This defines
+   the gradient and then animates it. */
+.grad-text {
+  background-image: linear-gradient(100deg,
+    var(--sig-gold) 0%, var(--sig-rose) 28%,
+    var(--sig-ink) 52%, var(--sig-teal) 76%, var(--sig-gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  background-size: 220% 100%;
+  animation: sigShimmer 7s ease-in-out infinite;
+}
+@keyframes sigShimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+html.perf-lite .grad-text, html.perf-quiet .grad-text { animation: none; }
+/* transparent text-fill is unreadable in forced-colors / print */
+@media (forced-colors: active), print {
+  .grad-text { -webkit-text-fill-color: currentColor; color: inherit; background: none; }
+}
+
+/* Section rule slides in rather than just appearing. */
+.sig-rule {
+  opacity: 0;
+  transform: translateX(-14px);
+  transition: opacity .6s ease, transform .6s cubic-bezier(.2, .8, .2, 1);
+}
+.sig-rule.in { opacity: 1; transform: none; }
+html.perf-lite .sig-rule { opacity: 1; transform: none; transition: none; }
+
+/* the rail's dot grows a connecting spine toward the active section */
+.sig-rail::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 26px;
+  bottom: 14px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .09);
+}
+.sig-rail-fill {
+  position: absolute;
+  left: 50%;
+  top: 26px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--sig-gold), var(--sig-ink));
+  transition: height .35s ease;
+  pointer-events: none;
+}
+
+/* hero floats get a slow, offset drift so the hero is never still */
+.hero-float { animation: sigDrift 9s ease-in-out infinite; }
+.hero-float-2 { animation-delay: -2.2s; }
+.hero-float-3 { animation-delay: -4.4s; }
+.hero-float-4 { animation-delay: -6.6s; }
+@keyframes sigDrift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-14px) rotate(4deg); }
+}
+html.perf-lite .hero-float, html.perf-quiet .hero-float { animation: none; }
+
+/* stat values flash when the live numbers update */
+@keyframes sigTick {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.12); color: var(--sig-gold); }
+  100% { transform: scale(1); }
+}
+.sig-tick { animation: sigTick .7s cubic-bezier(.34, 1.56, .64, 1); }
+
+/* numbered corners on the cards — the "index card" motif */
+.sig-indexed { position: relative; }
+.sig-indexed::after {
+  content: attr(data-index);
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-family: var(--sig-display);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  color: rgba(255, 255, 255, .22);
+  transition: color .3s ease;
+}
+.sig-indexed:hover::after { color: var(--sig-gold); }
+
+/* ---------------- 7. button ripple + glow ---------------- */
+.btn { position: relative; overflow: hidden; }
+.sig-ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: radial-gradient(circle, rgba(255, 255, 255, .55), transparent 70%);
+  animation: sigRipple .6s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes sigRipple { to { transform: scale(2.6); opacity: 0; } }
+
+/* cursor-follow glow on feature cards (desktop only) */
+.feature-card, .glass-card.sig-glow { position: relative; }
+.feature-card::after, .glass-card.sig-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .3s ease;
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 50%),
+              rgba(168, 155, 255, .13), transparent 65%);
+}
+.feature-card:hover::after, .glass-card.sig-glow:hover::after { opacity: 1; }
+html.perf-lite .feature-card::after,
+html.perf-lite .glass-card.sig-glow::after { display: none; }
+
+/* ---------------- 8. marquee ribbon ---------------- */
+.marquee-strip {
+  position: relative;
+  border-top: 1px solid rgba(245, 181, 68, .16);
+  border-bottom: 1px solid rgba(245, 181, 68, .16);
+}
+.marquee-strip::before,
+.marquee-strip::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 90px;
+  z-index: 2;
+  pointer-events: none;
+}
+.marquee-strip::before { left: 0; background: linear-gradient(90deg, var(--bg, #070b16), transparent); }
+.marquee-strip::after { right: 0; background: linear-gradient(270deg, var(--bg, #070b16), transparent); }
+
+/* ---------------- 9. footer signature ---------------- */
+.sig-signoff {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, .07);
+  font-size: .74rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .38);
+}
+.sig-signoff .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--sig-gold); }
+
+/* ---------------- 10. gating ---------------- */
+/* Rails and pointer-driven glows are desktop affordances. */
+@media (max-width: 1100px) { .sig-rail { display: none; } }
+@media (hover: none), (pointer: coarse) {
+  .sig-rail { display: none; }
+  .feature-card::after, .glass-card.sig-glow::after { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sig-crest .crest-ring { animation: none; }
+  .sig-underline { transition: none; width: 84px; }
+  .sig-ripple { display: none; }
+}

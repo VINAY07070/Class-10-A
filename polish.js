@@ -38,7 +38,7 @@
     /* ring reacts to interactive elements */
     document.addEventListener('mouseover', function (e) {
       var t = e.target;
-      if (t && t.closest && t.closest('a, button, .glass-card, .feature-card, input, .quick-link, .stickman, .pig-parameshwar')) {
+      if (t && t.closest && t.closest('a, button, .glass-card, .feature-card, input, .quick-link, .stickman, .pig-premeshwar')) {
         ring.classList.add('hot');
       } else {
         ring.classList.remove('hot');

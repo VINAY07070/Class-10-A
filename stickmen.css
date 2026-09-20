@@ -160,6 +160,20 @@
   100% { opacity: 0; transform: translate(-50%,-50%) scale(3.2); }
 }
 
+/* comic impact star, used where a punch or kick lands */
+.sm-impact {
+  width: 30px; height: 30px;
+  margin: -15px 0 0 -15px;
+  background: radial-gradient(circle, #fff 0 18%, #ffd889 19% 44%, rgba(255,120,60,0) 70%);
+  clip-path: polygon(50% 0, 61% 31%, 90% 18%, 73% 44%, 100% 50%, 73% 56%, 90% 82%, 61% 69%, 50% 100%, 39% 69%, 10% 82%, 27% 56%, 0 50%, 27% 44%, 10% 18%, 39% 31%);
+  animation: smImpact .55s cubic-bezier(.15,1.5,.4,1) forwards;
+}
+@keyframes smImpact {
+  0% { opacity: 0; transform: scale(.2) rotate(-30deg); }
+  30% { opacity: 1; transform: scale(1.25) rotate(6deg); }
+  100% { opacity: 0; transform: scale(1.7) rotate(20deg); }
+}
+
 /* figures duck UNDER open modals so they never cover dialog text */
 body:has(.modal-overlay.open) .stickmen-stage { z-index: 900; }
 /* nameplate hides while the bubble talks (no overlap) */

@@ -1,5 +1,5 @@
 /* ============================================================
-   PIG.JS — Parameshwar, the class pig.
+   PIG.JS — Premeshwar, the class pig.
 
    A small pink pig that wanders the bottom of every page on its own
    schedule, occasionally does something mischievous, and can be
@@ -24,7 +24,7 @@
   var REDUCED = !!P.reduced;
   var LITE = !!P.lite;
 
-  var NAMES = ['Parameshwar'];
+  var NAMES = ['Premeshwar'];
   var MOODS = [
     { id: 'walk', ms: 2600 },
     { id: 'idle', ms: 2200 },
@@ -97,12 +97,13 @@
   }
 
   function build() {
-    if (document.querySelector('.pig-parameshwar')) return;
+    if (document.querySelector('.pig-premeshwar')) return;
     el = document.createElement('div');
-    el.className = 'pig-parameshwar';
+    el.className = 'pig-premeshwar';
     el.setAttribute('role', 'img');
-    el.setAttribute('aria-label', 'Parameshwar the class pig');
+    el.setAttribute('aria-label', 'Premeshwar the class pig');
     el.innerHTML = pigSVG() +
+      '<div class="pig-tag" aria-hidden="true"><span class="pig-tag-text">Premeshwar</span></div>' +
       '<div class="pig-bubble" aria-hidden="true"><span class="pig-bubble-text"></span></div>';
     document.body.appendChild(el);
     svgEl = el.querySelector('.pig-svg');
@@ -297,7 +298,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
 
-  window.Parameshwar = {
+  window.Premeshwar = {
     say: say,
     goTo: function (nx) { x = clamp(nx, wanderMin, wanderMax); vx = 0; },
     destroy: function () { if (el && el.parentNode) el.parentNode.removeChild(el); mounted = false; }

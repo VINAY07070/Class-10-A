@@ -202,6 +202,90 @@ img { max-width: 100%; height: auto; }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
 }
 
+/* ---------- smartphone polish pass ----------
+   Fixes found by measuring a real 390x844 viewport rather than eyeballing:
+   sub-12px body copy, sub-44px tap targets, iOS input zoom, and the
+   fixed bar / content collisions. */
+
+/* No body copy below 12px, and no tap target below 44px, anywhere. */
+@media (max-width: 760px) {
+  /* --- legibility floor ---
+     Decorative micro-labels (eyebrows, badges) are allowed to stay small
+     because they are not body copy, but they get a readable floor too. */
+  p, li, td, .hero-subtitle, .section-head p, .news-item, .announcement-body,
+  .homework-body, .subject-desc, .teacher-role, .student-meta, .faq-answer,
+  .extras-note, .extras-card p { font-size: max(0.8125rem, 13px); }
+
+  .login-foot, .login-foot-item, .login-school, .footer-note, .site-footer p,
+  .sm-bubble, .pig-bubble, .toast, .session-chip, .stat-label, .strip-label,
+  .card-meta, .due-badge, .tag, .chip, .badge { font-size: 12px; }
+
+  /* --- tap-target floor ---
+     Inline nav links in the footer are the last place under 44px. Give
+     them a comfortable vertical hit box without changing the layout
+     rhythm of the footer columns. */
+  .site-footer a, .footer a, .footer-links a, .footer-nav a, .legal-links a {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .sm-tag { font-size: 11px; padding: 4px 10px; }
+
+  /* --- iOS: never let a focusable field be under 16px ---
+     16px is the threshold below which Safari zooms the whole page on
+     focus, which is one of the most jarring things on a phone. */
+  input, select, textarea, .search-input, .chat-input, .sync-code,
+  .form-group input, .form-group select, .form-group textarea {
+    font-size: 16px !important;
+  }
+
+  /* --- sticky bars: keep content clear of both the navbar and tabbar --- */
+  .container { scroll-margin-top: calc(var(--navbar-h) + 12px); }
+  section[id], div[id] { scroll-margin-top: calc(var(--navbar-h) + 12px); }
+
+  /* --- comfort: slightly tighter but calmer vertical rhythm --- */
+  .section { padding: 46px 0; }
+  .section-head { margin-bottom: 24px; }
+  .glass-card { padding: 18px 15px; }
+
+  /* --- remaining sub-44px controls found by measurement --- */
+  .navbar-brand { min-height: 44px; display: inline-flex; align-items: center; }
+  .subject-pill { min-height: 44px; }
+  .subject-open-btn { min-height: 44px; padding-top: 12px; padding-bottom: 12px; }
+  .suggest-chip, .suggested-chip { min-height: 44px; display: inline-flex; align-items: center; }
+  .announcement-readmore { min-height: 44px; display: inline-flex; align-items: center; padding: 8px 0; }
+
+  /* --- muted micro-copy floor --- */
+  .text-muted, .student-number, .extras-tag, .card-meta, .admin-badge { font-size: 12px; }
+
+  /* --- teacher spotlight detail is real content, not chrome --- */
+  .teacher-mini-subject, .teacher-mini-detail, .spot-badge, .sig-signoff { font-size: 12px; }
+  /* --- tab bar labels: the one place 10px icons + 10px text is normal,
+         but they still get a readable floor --- */
+  .tabbar-item span, .tabbar-label { font-size: 11px; }
+
+  /* --- signature chrome --- */
+  .sig-rule { font-size: 11px; }
+  .sig-rule-num { height: 22px; min-width: 28px; }
+}
+
+/* Very small phones: drop the heaviest decorative layers so the page stays
+   light without losing its identity. */
+@media (max-width: 380px) {
+  .page-header { padding-top: calc(var(--navbar-h) + 26px); }
+  .section { padding: 40px 0; }
+  .features-grid, .feature-grid, .stats-grid { gap: 10px; }
+  p, li, td { font-size: 13px; }
+}
+
+/* Short landscape: the hero should not eat the whole screen. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .section { padding: 30px 0; }
+  body.has-tabbar { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
+}
+
 /* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }

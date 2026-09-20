@@ -89,7 +89,7 @@
   /* Wall-climb descent speed, px/s. Slow enough to read as deliberate
      climbing rather than sliding. */
   var C_SPEED = 52;
-  var lastHighFive = -HF_CD, lastAmbient = 0;
+  var lastHighFive = -HF_CD, lastAmbient = 0, fightCd = 0;
   var floorPad = 10, figW = 88;            // set by measure()
   var MIN_X = 40, MAX_X = 300;
 
@@ -227,6 +227,9 @@
       else if (kind === 'stars') puff(c.x + rand(-18, 18), c.top + rand(-6, 10), pick(['★', '✦', '✶']), 'sm-emoji');
       else if (kind === 'notes') puff(c.x + rand(-20, 20), c.top - rand(0, 14), pick(['♪', '♫', '♩']), 'sm-emoji');
       else if (kind === 'hearts') puff(c.x + rand(-16, 16), c.top - rand(0, 10), pick(['❤', '💜', '✨']), 'sm-emoji');
+      else if (kind === 'impact') puff(c.x, c.y, '', 'sm-impact');
+      else if (kind === 'sweat') puff(c.x + rand(-14, 14), c.top - rand(0, 12), pick(['💧', '·']), 'sm-emoji');
+      else if (kind === 'zzzbig') puff(c.x + rand(-10, 22), c.top - rand(0, 14), pick(['z', 'Z']), 'sm-zzz');
     }
   }
   function zzz(F) { var c = figCenter(F); puff(c.x + 16, c.top - 4, 'z', 'sm-zzz'); }
@@ -368,7 +371,7 @@
      A repeated tap should not repeat the same move — it makes the mascot
      look mechanical. `nextReaction` rotates through a small repertoire and
      remembers what was used last, so consecutive taps always look different. */
-  var REACTIONS = ['wave', 'jump', 'point', 'nod', 'shrug'];
+  var REACTIONS = ['wave', 'jump', 'point', 'nod', 'shrug', 'dance', 'kick', 'cartwheel', 'backflip', 'stretch'];
   var lastReaction = 0;
   function pickReaction() {
     var i = (lastReaction + 1 + ((Math.random() * (REACTIONS.length - 1)) | 0)) % REACTIONS.length;
@@ -386,6 +389,11 @@
         case 'jump': doJump(F, 40); break;
         case 'point': doPoint(F, 1500); break;
         case 'nod': doNod(F, 1200); break;
+        case 'dance': doDance(F, 2200); burst(F, 4, 'notes'); break;
+        case 'kick': doKick(F, 1100); break;
+        case 'cartwheel': doCartwheel(F, 1400); break;
+        case 'backflip': doBackflip(F); break;
+        case 'stretch': doStretch(F, 2200); break;
         default: doShrug(F, 1400); break;
       }
     }
@@ -408,6 +416,88 @@
   function doNod(F, ms) { if (gesture(F, 'nod', ms)) { F.smileT = 0.9; } }
   function doShrug(F, ms) { if (gesture(F, 'shrug', ms)) { F.smileT = 0.5; F.mouthOpenT = 0.15; } }
   function doCower(F, ms) { if (gesture(F, 'cower', ms)) { F.smileT = 0.2; F.mouthOpenT = 0.8; } }
+
+  /* ---- the activity repertoire --------------------------------------
+     These are the "lively" moves the brief asked for: a classic stickman
+     fight, a couple of sports beats, and a few bits of business that make
+     the pair read as two kids messing about rather than two sprites on a
+     loop. Each is a plain timed mode, so it composes with the idle
+     breathing instead of fighting it (see renderFigure). */
+  function doKick(F, ms) { if (gesture(F, 'kick', ms || 1100)) { F.smileT = 0.9; F.mouthOpenT = 0.3; } }
+  function doPunch(F, ms) { if (gesture(F, 'punch', ms || 900)) { F.smileT = 0.85; F.mouthOpenT = 0.35; } }
+  function doDuck(F, ms) { if (gesture(F, 'duck', ms || 900)) { F.smileT = 0.8; } }
+  function doCartwheel(F, ms) { if (gesture(F, 'cartwheel', ms || 1500)) { F.smileT = 1; } }
+  function doPushup(F, ms) { if (gesture(F, 'pushup', ms || 2400)) { F.smileT = 0.7; } }
+  function doSleep(F, ms) { if (gesture(F, 'sleep', ms || 4200)) { F.smileT = 0.4; } }
+  function doStretch(F, ms) { if (gesture(F, 'stretch', ms || 2400)) { F.smileT = 0.9; F.mouthOpenT = 0.4; } }
+  function doCheer(F, ms) { if (gesture(F, 'cheer', ms || 2200)) { F.smileT = 1; F.mouthOpenT = 0.6; burst(F, 8, 'confetti'); } }
+  function doBackflip(F) {
+    if (!F || F.dragging || REDUCED || F.mode !== 'idle') return;
+    F.mode = 'backflip'; F.t0 = performance.now(); F.dur = 1150; F.onDone = null;
+    F.smileT = 1; F.mouthOpenT = 0.5; F.spin = 0;
+    later(function () { burst(F, 8, 'spark'); if (canBubble(F)) say(F, pick(['Backflip!', 'Watch this!', 'Ta-da!']), 1600); }, 700);
+  }
+
+  /* A proper two-person scrap: they square up, trade a couple of quick
+     blows, knock each other about, then make up. Choreographed as a
+     sequence of timed modes rather than a separate system, so it reuses
+     all the existing pose and particle machinery. */
+  function startFight() {
+    if (REDUCED || hidden || document.hidden) return false;
+    var V = figures.vinay, N = figures.nitin;
+    if (!V || !N || V.dragging || N.dragging) return false;
+    if (V.mode !== 'idle' || N.mode !== 'idle') return false;
+    if (performance.now() < fightCd) return false;
+    fightCd = performance.now() + 55000;
+
+    var mid = clamp((V.x + N.x) / 2, MIN_X + 70, MAX_X - 70);
+    /* shuffle to face-off positions, flipping to look at each other */
+    walkTo('vinay', mid - 30, function () {
+      walkTo('nitin', mid + 30, function () {
+        if (hidden || V.dragging || N.dragging) return;
+        V.dir = 1; N.dir = -1;
+        V.mode = 'idle'; N.mode = 'idle';
+        if (canBubble(V)) say(V, pick(['You and me!', 'Bring it!', 'Round one!']), 1500);
+        if (canBubble(N)) say(N, pick(['Ha! Try me.', 'Not scared!', 'Come on then!']), 1500);
+        burst(V, 4, 'spark'); burst(N, 4, 'spark');
+        later(function () { fightBlow(V, N, 0); }, 900);
+      });
+    });
+    return true;
+  }
+
+  /* One exchange of the fight. Alternates attacker, so the whole thing
+     reads as a scrap rather than one kid hitting a mannequin. */
+  function fightBlow(A, B, n) {
+    if (REDUCED || hidden || A.dragging || B.dragging) return;
+    var attacker = n % 2 === 0 ? A : B;
+    var defender = n % 2 === 0 ? B : A;
+    var move = n % 3 === 0 ? 'punch' : (n % 3 === 1 ? 'kick' : 'punch');
+
+    defender.mode = 'duck'; defender.t0 = performance.now(); defender.dur = 620; defender.smileT = 0.6;
+    later(function () {
+      attacker.mode = move; attacker.t0 = performance.now(); attacker.dur = 620; attacker.smileT = 0.95;
+      attacker.mouthOpenT = 0.6;
+    }, 120);
+    /* impact: a puff where the hit lands, and a recoil on the defender */
+    later(function () {
+      var c = figCenter(defender);
+      puff(c.x + (attacker.x < defender.x ? -14 : 14), c.y - 26, '', 'sm-impact');
+      defender.leanT = attacker.x < defender.x ? 0.22 : -0.22;
+      burst(defender, 3, 'stars');
+      if (canBubble(attacker)) say(attacker, pick(['Pow!', 'Hah!', 'Gotcha!']), 900);
+    }, 380);
+
+    if (n < 5) later(function () { fightBlow(A, B, n + 1); }, 820);
+    else later(function () {
+      /* make up: dust off, shake hands, rub heads */
+      [A, B].forEach(function (F) { F.mode = 'idle'; F.leanT = 0; F.mouthOpenT = 0; F.smileT = 0.9; });
+      if (canBubble(A)) say(A, pick(['Good one.', 'You alright?', 'Truce!']), 1600);
+      if (canBubble(B)) say(B, pick(['Yeah yeah.', 'Nice moves!', 'Haha!']), 1600);
+      doWave(A, 1400); later(function () { doWave(B, 1400); }, 300);
+      burst(A, 4, 'hearts'); burst(B, 4, 'hearts');
+    }, 900);
+  }
 
   /* React to what the user actually did, with a matching gesture. */
   function reactTo(action) {
@@ -528,28 +618,51 @@
           var V = figures.vinay, N = figures.nitin;
           var idleV = V && V.mode === 'idle' && !V.dragging;
           var idleN = N && N.mode === 'idle' && !N.dragging;
-          if (r < 0.42) { /* walk one of them */
+          /* helper: whichever of the two is free to do something */
+          function freeOne() {
+            if (idleV && idleN) return Math.random() < 0.5 ? V : N;
+            return idleV ? V : (idleN ? N : null);
+          }
+          if (r < 0.26) { /* walk one of them */
             var k = Math.random() < 0.5 ? 'vinay' : 'nitin';
             if (!startWalk(k)) startWalk(k === 'vinay' ? 'nitin' : 'vinay');
-          } else if (r < 0.52 && ((V && canClimb(V)) || (N && canClimb(N)))) {
+          } else if (r < 0.34 && idleV && idleN) {
+            /* a full two-person scrap, the headline activity */
+            if (!startFight()) { var kf = freeOne(); if (kf) doPunch(kf, 900); }
+          } else if (r < 0.41 && ((V && canClimb(V)) || (N && canClimb(N)))) {
             /* occasionally send one down a screen edge */
             var CF = (V && canClimb(V)) ? V : N;
             if (CF) startClimb(CF); else startWalk('vinay');
-          } else if (r < 0.63 && (idleV || idleN)) {
-            var F1 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
-            doWave(F1, 1700);
-            if (Math.random() < 0.4 && canBubble(F1)) say(F1, pick(QUIPS), 1500);
-          } else if (r < 0.72 && (idleV || idleN)) {
-            var F2 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
-            doDance(F2, 2400); burst(F2, 5, 'notes');
-          } else if (r < 0.80 && (idleV || idleN)) {
-            var F3 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
-            doJump(F3, rand(36, 58));
-          } else if (r < 0.90) { maybeHighFive(); }
-          else if (idleV || idleN) {
-            var F4 = idleV && idleN ? (Math.random() < 0.5 ? V : N) : (idleV ? V : N);
-            doYawn(F4);
-          }
+          } else if (r < 0.47 && freeOne()) {
+            var w1 = freeOne();
+            doWave(w1, 1700);
+            if (Math.random() < 0.4 && canBubble(w1)) say(w1, pick(QUIPS), 1500);
+          } else if (r < 0.54 && freeOne()) {
+            var d1 = freeOne();
+            doDance(d1, 2400); burst(d1, 5, 'notes');
+          } else if (r < 0.60 && freeOne()) {
+            doJump(freeOne(), rand(36, 58));
+          } else if (r < 0.65 && freeOne()) {
+            doBackflip(freeOne());
+          } else if (r < 0.70 && freeOne()) {
+            /* sports beats */
+            var s1 = freeOne();
+            if (Math.random() < 0.5) doKick(s1, 1100);
+            else doCheer(s1, 2200);
+          } else if (r < 0.75 && freeOne()) {
+            doCartwheel(freeOne(), 1500);
+          } else if (r < 0.80 && freeOne()) {
+            doStretch(freeOne(), 2400);
+          } else if (r < 0.84 && freeOne()) {
+            var p1 = freeOne();
+            doPushup(p1, 2400);
+            burst(p1, 1, 'sweat');
+          } else if (r < 0.88 && freeOne()) {
+            var z1 = freeOne();
+            doSleep(z1, 4200);
+            zzz(z1);
+          } else if (r < 0.94) { maybeHighFive(); }
+          else if (freeOne()) { doYawn(freeOne()); }
           /* rare ambient chatter */
           var now = performance.now();
           if (now - lastAmbient > 75000 && Math.random() < 0.35) {
@@ -635,12 +748,19 @@
       F.phase += dt * 14;
       F.dizzy = Math.max(F.dizzy, 0.4);
     } else if (F.mode === 'wave' || F.mode === 'dance' || F.mode === 'yawn' || F.mode === 'highfive' ||
-                 F.mode === 'point' || F.mode === 'nod' || F.mode === 'shrug' || F.mode === 'cower') {
+                 F.mode === 'point' || F.mode === 'nod' || F.mode === 'shrug' || F.mode === 'cower' ||
+                 F.mode === 'kick' || F.mode === 'punch' || F.mode === 'duck' || F.mode === 'cartwheel' ||
+                 F.mode === 'pushup' || F.mode === 'sleep' || F.mode === 'stretch' || F.mode === 'cheer' ||
+                 F.mode === 'backflip') {
       p = clamp((now - F.t0) / F.dur, 0, 1);
       if (F.mode === 'dance' && Math.random() < dt * 3) burst(F, 1, 'notes');
       if (F.mode === 'yawn' && Math.random() < dt * 1.4) zzz(F);
       if (F.mode === 'highfive') F.yOff = -14 * 4 * p * (1 - p);
-      if (p >= 1) { F.mode = 'idle'; F.yOff = 0; F.mouthOpenT = 0; if (F.smileT > 0.8) F.smileT = 0.7; }
+      if (F.mode === 'backflip' && p > 0.1 && p < 0.9) F.yOff = -46 * Math.sin((p - 0.1) / 0.8 * Math.PI);
+      if (p >= 1) {
+        F.mode = 'idle'; F.yOff = 0; F.mouthOpenT = 0; F.extraSpin = 0;
+        if (F.smileT > 0.8) F.smileT = 0.7;
+      }
     } else if (F.mode === 'drag') {
       /* dangle pendulum */
       var D = F.dangle;
@@ -817,6 +937,106 @@
       hR.x = 76 + 6 * cp; hR.y = 58 + 4 * cp;
       fL.x -= 3 * cp; fR.x += 3 * cp;
       tilt = -0.1 * cp;
+    } else if (F.mode === 'kick') {
+      /* a sport/martial-arts kick: plant one leg, whip the other out
+         front, arms counterbalance. Reads clearly even at mascot size. */
+      var kp = clamp((now - F.t0) / F.dur, 0, 1);
+      var snap = Math.sin(kp * Math.PI);                    /* out and back */
+      var kickLeg = F.dir > 0 ? 'R' : 'L';
+      if (kickLeg === 'R') { fR.x = FOOT_R.x + 26 * snap; fR.y = GY - 34 * snap; fL.x = FOOT_L.x - 4 * snap; }
+      else { fL.x = FOOT_L.x - 26 * snap; fL.y = GY - 34 * snap; fR.x = FOOT_R.x + 4 * snap; }
+      hL.x = 34 + 8 * snap; hL.y = 74 + 6 * snap;
+      hR.x = 86 - 10 * snap; hR.y = 96 - 4 * snap;
+      hip.y -= 3 * snap; chest.y -= 2 * snap;
+      tilt = 0.16 * snap; headY += 2 * snap;
+    } else if (F.mode === 'punch') {
+      /* fast jab straight ahead, shoulder turned into it, rear foot braced */
+      var jp2 = clamp((now - F.t0) / F.dur, 0, 1);
+      var jext = Math.sin(jp2 * Math.PI);
+      var lead = F.dir > 0 ? 'R' : 'L';
+      if (lead === 'R') { hR.x = 78 + 30 * jext; hR.y = 74 - 6 * jext; hL.x = 40 - 2 * jext; hL.y = 84 + 4 * jext; }
+      else { hL.x = 42 - 30 * jext; hL.y = 74 - 6 * jext; hR.x = 80 + 2 * jext; hR.y = 84 + 4 * jext; }
+      chest.x += (F.dir > 0 ? 1 : -1) * 5 * jext;
+      hip.x += (F.dir > 0 ? 1 : -1) * 3 * jext;
+      fR.x += (F.dir > 0 ? 0 : 5) * jext; fL.x -= (F.dir > 0 ? 5 : 0) * jext;
+      tilt = 0.12 * jext;
+    } else if (F.mode === 'duck') {
+      /* sink under a swing, arms up guarding the face */
+      var dp = clamp((now - F.t0) / F.dur, 0, 1);
+      var duck = Math.sin(dp * Math.PI);
+      hip.y += 16 * duck; chest.y += 20 * duck; headY += 24 * duck;
+      hL.x = 44 + 6 * duck; hL.y = 62 + 8 * duck;
+      hR.x = 76 - 6 * duck; hR.y = 62 + 8 * duck;
+      fL.x -= 4 * duck; fR.x += 4 * duck;
+      tilt = 0.06 * duck;
+    } else if (F.mode === 'cartwheel') {
+      /* sideways roll: the whole body pivots about the hip while the
+         limbs stay extended like spokes */
+      var cw = clamp((now - F.t0) / F.dur, 0, 1);
+      var spin = cw * Math.PI * 2;
+      F.extraSpin = spin;                        /* consumed below */
+      hip.y -= 34 * Math.sin(cw * Math.PI);
+      hL.x = 60 - 30 * Math.cos(spin); hL.y = 84 + 30 * Math.sin(spin);
+      hR.x = 60 + 30 * Math.cos(spin); hR.y = 84 + 30 * Math.sin(spin);
+      fL.x = 60 - 28 * Math.cos(spin); fL.y = 112 + 28 * Math.sin(spin);
+      fR.x = 60 + 28 * Math.cos(spin); fR.y = 112 + 28 * Math.sin(spin);
+      tilt = Math.sin(spin) * 0.3;
+    } else if (F.mode === 'pushup') {
+      /* plank down to the floor and back, arms bending in the middle */
+      var pu = clamp((now - F.t0) / F.dur, 0, 1);
+      var wave = (1 - Math.cos(pu * Math.PI * 4)) / 2;   /* four reps */
+      var drop = wave;
+      hip.x = 60; hip.y = 112 - 46 + 18 * drop; chest.y = 78 - 30 + 16 * drop;
+      headX = 60; headY = 60 - 24 + 14 * drop;
+      fL.y = GY; fR.y = GY; fL.x = 56; fR.x = 64;        /* feet planted */
+      hL.x = 44; hL.y = GY - 24 + 14 * drop;
+      hR.x = 76; hR.y = GY - 24 + 14 * drop;
+      tilt = -0.5;
+      if (F.smileT < 0.6) F.smileT = 0.7;
+    } else if (F.mode === 'sleep') {
+      /* curled up on the floor, slow breathing, z's drifting up */
+      var sl = Math.sin(t * 1.2) * 1.4;
+      hip.x = 58; hip.y = 132 + sl; chest.x = 50; chest.y = 136 + sl;
+      headX = 40; headY = 140 + sl;
+      hL.x = 48; hL.y = 142; hR.x = 56; hR.y = 146;
+      fL.x = 70; fL.y = GY; fR.x = 76; fR.y = GY - 2;
+      tilt = -0.9;
+      if (Math.random() < dt * 1.1) burst(F, 1, 'zzzbig');
+    } else if (F.mode === 'stretch') {
+      /* yawn-stretch: reach both arms overhead, rise onto the toes */
+      var st = Math.sin(clamp((now - F.t0) / F.dur, 0, 1) * Math.PI);
+      hL.x = 56 - 6 * st; hL.y = 110 - 62 * st;
+      hR.x = 64 + 6 * st; hR.y = 110 - 62 * st;
+      hip.y -= 7 * st; chest.y -= 9 * st; headY -= 10 * st;
+      fL.y = GY - 5 * st; fR.y = GY - 5 * st;
+      tilt = -0.05 * st;
+    } else if (F.mode === 'cheer') {
+      /* both arms punched up, bouncing on the spot */
+      var ch = Math.abs(Math.sin(t * 7));
+      hip.y -= 4 + ch * 9; chest.y -= 5 + ch * 10; headY -= 6 + ch * 11;
+      hL.x = 42; hL.y = 62 - ch * 26;
+      hR.x = 78; hR.y = 62 - ch * 26;
+      fL.y = GY - (ch > 0.5 ? 7 : 0); fR.y = GY - (ch > 0.5 ? 0 : 7);
+      tilt = Math.sin(t * 7) * 0.07;
+    } else if (F.mode === 'backflip') {
+      /* crouch, launch, tuck, rotate a full turn, land */
+      var bp = clamp((now - F.t0) / F.dur, 0, 1);
+      var rot;
+      if (bp < 0.15) { rot = 0; hip.y += 10 * (bp / 0.15); chest.y += 8 * (bp / 0.15); }
+      else if (bp > 0.85) { rot = 0; hip.y += 10 * ((1 - bp) / 0.15); chest.y += 8 * ((1 - bp) / 0.15); }
+      else {
+        var fp = (bp - 0.15) / 0.7;
+        rot = fp * Math.PI * 2;
+        F.extraSpin = rot;
+        /* tuck: limbs drawn in tight while airborne */
+        var tuck = Math.sin(fp * Math.PI);
+        hL.x = 60 - 16 * tuck; hL.y = 84 + 6 * tuck;
+        hR.x = 60 + 16 * tuck; hR.y = 84 + 6 * tuck;
+        fL.x = 60 - 12 * tuck; fL.y = 112 + 10 * tuck;
+        fR.x = 60 + 12 * tuck; fR.y = 112 + 10 * tuck;
+        hip.y -= 40 * tuck;
+      }
+      if (bp >= 1) burst(F, 6, 'dust');
     } else if (F.mode === 'yawn') {
       hip.y += 4; chest.y += 4; headY += 9; tilt = 0.12;
       hL.y += 7; hR.y += 7; fL.x -= 2; fR.x += 2;
@@ -908,8 +1128,10 @@
     E.shadow.setAttribute('opacity', (0.28 * (1 - airH * 0.6)).toFixed(2));
     E.shadow.setAttribute('rx', (15 * (1 - airH * 0.3)).toFixed(1));
 
-    /* world position — thrown figures also tumble about their own centre */
-    var rot = F.spin ? ' rotate(' + (F.spin * 57.3).toFixed(1) + 'deg)' : '';
+    /* world position — thrown figures tumble about their own centre, and
+       cartwheel/backflip add their own rotation on top of that. */
+    var totalSpin = (F.spin || 0) + (F.extraSpin || 0);
+    var rot = totalSpin ? ' rotate(' + (totalSpin * 57.3).toFixed(1) + 'deg)' : '';
     F.el.style.transform = 'translate3d(' + F.x.toFixed(1) + 'px,' + (F.y + F.yOff).toFixed(1) + 'px,0)' + rot;
   }
 
@@ -1028,6 +1250,31 @@
     greet: greet,
     react: reactTo,
     interest: interest,
+    /* Trigger a named activity on one mascot (or either, by name).
+       Used by the page to celebrate real events, and by tests. */
+    act: function (name, k) {
+      var F = k ? figures[k] : figures[Math.random() < 0.5 ? 'vinay' : 'nitin'];
+      if (!F || F.mode !== 'idle' || F.dragging) return false;
+      switch (name) {
+        case 'wave': doWave(F, 1700); return true;
+        case 'jump': doJump(F, 46); return true;
+        case 'dance': doDance(F, 2400); return true;
+        case 'kick': doKick(F, 1100); return true;
+        case 'punch': doPunch(F, 900); return true;
+        case 'cartwheel': doCartwheel(F, 1500); return true;
+        case 'backflip': doBackflip(F); return true;
+        case 'stretch': doStretch(F, 2400); return true;
+        case 'cheer': doCheer(F, 2200); return true;
+        case 'pushup': doPushup(F, 2400); return true;
+        case 'sleep': doSleep(F, 4200); return true;
+        case 'highfive': maybeHighFive(); return true;
+        case 'fight': return startFight();
+        default: return false;
+      }
+    },
+    /* full list of activities, for the admin debug view */
+    activities: ['wave', 'jump', 'dance', 'kick', 'punch', 'cartwheel', 'backflip',
+                 'stretch', 'cheer', 'pushup', 'sleep', 'highfive', 'fight'],
     /* Introspection for tests and for the admin debug view: what each mascot
        is doing right now. Read-only. */
     state: function () {
