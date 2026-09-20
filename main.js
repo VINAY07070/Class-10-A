@@ -195,7 +195,8 @@ var App = (function () {
       { href: 'scores.html', icon: 'fa-chart-column', label: 'Scores' },
       { href: 'announcements.html', icon: 'fa-bullhorn', label: 'News' },
       { href: 'polls.html', icon: 'fa-square-poll-vertical', label: 'Polls' },
-      { href: 'ai.html', icon: 'fa-robot', label: 'AI Bot' }
+      { href: 'ai.html', icon: 'fa-robot', label: 'AI Bot' },
+      { href: 'extras.html', icon: 'fa-wand-magic-sparkles', label: 'Extras' }
     ];
   }
 
@@ -282,6 +283,7 @@ var App = (function () {
       '<a href="chat.html"><i class="fa-solid fa-message"></i> Chat</a>' +
       '<a href="subjects.html"><i class="fa-solid fa-book-open"></i> Subjects</a>' +
       '<a href="ai.html"><i class="fa-solid fa-robot"></i> Class AI</a>' +
+      '<a href="extras.html"><i class="fa-solid fa-wand-magic-sparkles"></i> Extras</a>' +
       '<a href="admin.html"><i class="fa-solid fa-gear"></i> Admin</a>' +
       '</div>' +
       '</div>' +

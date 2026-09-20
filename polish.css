@@ -1,0 +1,125 @@
+/* ============================================================
+   POLISH.CSS — finishing touches from the layout & theme brief.
+
+   Adds the items that were still missing: angular section dividers,
+   refined glass, the desktop cursor follower, smooth page transitions
+   and a scroll-shifting background hue.
+
+   Everything here is additive and transform/opacity only, and every
+   heavy effect is switched off under the per-lite tier and
+   prefers-reduced-motion, so none of it can reintroduce the phone lag.
+   ============================================================ */
+
+/* ---- diagonal / angular section dividers -------------------------- */
+.section-divider {
+  position: relative;
+  height: 60px;
+  margin: -1px 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.section-divider svg { display: block; width: 100%; height: 100%; }
+.section-divider svg path { fill: rgba(255, 255, 255, .022); }
+
+/* ---- refined glass: subtle inner highlight + noise-free depth ----- */
+.glass-card {
+  position: relative;
+  isolation: isolate;
+}
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .13), rgba(255, 255, 255, 0) 47%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ---- accent coding per section ------------------------------------ */
+.page-header[data-accent="students"] .page-icon { color: #6ea8ff; background: rgba(79,140,255,.14); border-color: rgba(79,140,255,.32); }
+.page-header[data-accent="teachers"] .page-icon { color: #ffd889; background: rgba(245,181,68,.14); border-color: rgba(245,181,68,.32); }
+.page-header[data-accent="homework"] .page-icon { color: #6ee7b7; background: rgba(52,211,153,.14); border-color: rgba(52,211,153,.32); }
+.page-header[data-accent="scores"]   .page-icon { color: #c4b5fd; background: rgba(124,108,255,.15); border-color: rgba(124,108,255,.33); }
+.page-header[data-accent="chat"]     .page-icon { color: #5eead4; background: rgba(20,184,166,.15); border-color: rgba(20,184,166,.33); }
+.page-header[data-accent="extras"]   .page-icon { color: #ff9ecb; background: rgba(255,110,199,.14); border-color: rgba(255,110,199,.3); }
+
+/* ---- desktop cursor follower -------------------------------------- */
+.cursor-dot, .cursor-ring {
+  position: fixed;
+  top: 0; left: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 10000;
+  will-change: transform;
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+.cursor-dot {
+  width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  background: var(--gold, #f5b544);
+  box-shadow: 0 0 8px rgba(245, 181, 68, .7);
+}
+.cursor-ring {
+  width: 30px; height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 1.5px solid rgba(245, 181, 68, .5);
+  transition: opacity .22s ease, width .18s ease, height .18s ease, border-color .18s ease;
+}
+body.cursor-on .cursor-dot, body.cursor-on .cursor-ring { opacity: 1; }
+body.cursor-on .cursor-ring.hot {
+  width: 46px; height: 46px;
+  border-color: rgba(245, 181, 68, .85);
+}
+/* only ever on a real pointer; never on touch */
+@media (hover: none), (pointer: coarse) {
+  .cursor-dot, .cursor-ring { display: none !important; }
+}
+html.perf-lite .cursor-dot, html.perf-lite .cursor-ring { display: none !important; }
+
+/* ---- page transitions --------------------------------------------- */
+body.page-enter .page-header,
+body.page-enter .section {
+  opacity: 0;
+  transform: translateY(14px);
+}
+body.page-entered .page-header,
+body.page-entered .section {
+  opacity: 1;
+  transform: none;
+  transition: opacity .5s ease, transform .5s cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ---- split-flap-ish heading reveal (transform only) --------------- */
+.heading-split { display: inline-block; }
+
+/* ---- scroll-shifting ambient wash ---------------------------------
+   Two fixed, pre-painted radial gradients whose opacity is driven by the
+   quantised --scroll-p value. Opacity on an already-composited layer is
+   cheap; this avoids animating a gradient or a filter per frame.        */
+:root { --scroll-p: 0; }
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 620px at 82% -8%, rgba(124, 108, 255, .16), transparent 62%),
+    radial-gradient(1000px 560px at 12% 108%, rgba(245, 181, 68, .11), transparent 64%);
+  opacity: calc(.35 + var(--scroll-p) * .65);
+  transition: opacity .4s linear;
+}
+html.perf-lite body::after { opacity: .4; transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  body.page-enter .page-header,
+  body.page-enter .section { opacity: 1; transform: none; }
+  .cursor-dot, .cursor-ring { display: none !important; }
+}

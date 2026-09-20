@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('aia_theme');
+        if (t && ['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) !== -1) {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#070b16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AIA Class 10-A Hub — Extras &amp; Resources</title>
+  <meta name="description" content="Extra study resources for Class 10-A, pulled from a configurable JSON source with an offline cache.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/stickmen.css">
+  <link rel="stylesheet" href="css/themes.css">
+
+  <script src="perf.js"></script>
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+
+  <header class="page-header">
+    <div class="container">
+      <div class="page-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+      <h1 class="heading-lg text-gold reveal">Extras &amp; Resources</h1>
+      <p class="reveal reveal-delay-1">Study tips, formulas and exam help pulled from a configurable online source — with an offline cache so it always opens.</p>
+    </div>
+  </header>
+
+  <section class="section" style="padding-top:0">
+    <div class="container">
+
+      <!-- Where the data comes from + controls -->
+      <div class="glass-card reveal extras-source-card">
+        <div class="extras-source-head">
+          <div>
+            <h2 class="heading-sm"><i class="fa-solid fa-satellite-dish"></i> Resource source</h2>
+            <p class="extras-src-line" id="extrasSrcLine">Checking configured source…</p>
+          </div>
+          <div class="extras-src-actions">
+            <button class="btn btn-secondary" id="extrasRefresh" type="button">
+              <i class="fa-solid fa-rotate"></i> Refresh
+            </button>
+            <button class="btn btn-secondary" id="extrasClear" type="button">
+              <i class="fa-solid fa-eraser"></i> Clear cache
+            </button>
+          </div>
+        </div>
+        <p class="extras-hint" id="extrasHint"></p>
+      </div>
+
+      <!-- Result area -->
+      <div id="extrasStatus" class="extras-status reveal" hidden></div>
+      <div class="extras-grid" id="extrasGrid"></div>
+
+      <!-- Quick study tools that work fully offline -->
+      <h2 class="heading-md section-heading reveal">Offline quick tools</h2>
+      <div class="extras-tools" id="extrasTools"></div>
+
+    </div>
+  </section>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="data/seed.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/stickmen.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/extras.js"></script>
+</body>
+</html>

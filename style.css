@@ -153,6 +153,20 @@ h1, h2, h3, h4 { line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
 .btn:active { transform: scale(0.96); }
 .btn-sm { padding: 8px 16px; font-size: 0.85rem; border-radius: 10px; }
 
+/* ---- touch target floor -------------------------------------------
+   The brief requires every tap target to be at least 44px. Rather than
+   chasing each component, guarantee it once here for real pointers and
+   let the visual padding stay as designed. Small buttons keep their look
+   but get an invisible hit area that reaches the 44px minimum.        */
+@media (hover: none), (pointer: coarse) {
+  .btn, .btn-sm, .quick-link, .tabbar a, .icon-btn,
+  button.btn, a.btn, input[type="submit"] {
+    min-height: 44px;
+  }
+  /* Compensate for .btn-sm's tighter look without shrinking the target. */
+  .btn-sm { padding-top: 12px; padding-bottom: 12px; }
+}
+
 .btn-primary {
   background: var(--grad-primary);
   color: #fff;
