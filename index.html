@@ -3,10 +3,9 @@
 <head>  <script>
     (function () {
       try {
-        var t = localStorage.getItem('aia_theme');
-        if (t && ['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) !== -1) {
-          document.documentElement.setAttribute('data-theme', t);
-        }
+        var t = localStorage.getItem('aia_theme') || 'luxury';
+        if (['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) === -1) t = 'luxury';
+        document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     })();
   </script>
@@ -184,22 +183,9 @@
     </div>
   </section>
 
-  <!-- MARQUEE (updates ticker) -->
-  <div class="marquee-strip" role="marquee" aria-label="Latest updates">
-    <div class="marquee-track">
-      <div class="marquee-item"><span class="badge">EVENT</span> ANNUAL FUNCTION — 31 OCT or 5 NOV · Fee ₹850</div>
-      <div class="marquee-item"><span class="badge blue">TESTS</span> ECONOMICS class test done — how was it?</div>
-      <div class="marquee-item"><span class="badge">TOPPER</span> 👑 NITIN scored 49/50 in MATHS!</div>
-      <div class="marquee-item"><span class="badge blue">LIVE</span> 🗳️ Favourite teacher poll — vote now!</div>
-      <div class="marquee-item"><span class="badge">CHAT</span> 💬 Student chat is open — login and say hi!</div>
-      <div class="marquee-item"><span class="badge blue">AI</span> 🤖 Class AI now supports smart API mode.</div>
-      <div class="marquee-item"><span class="badge">EVENT</span> ANNUAL FUNCTION — 31 OCT or 5 NOV · Fee ₹850</div>
-      <div class="marquee-item"><span class="badge blue">TESTS</span> ECONOMICS class test done — how was it?</div>
-      <div class="marquee-item"><span class="badge">TOPPER</span> 👑 NITIN scored 49/50 in MATHS!</div>
-      <div class="marquee-item"><span class="badge blue">LIVE</span> 🗳️ Favourite teacher poll — vote now!</div>
-      <div class="marquee-item"><span class="badge">CHAT</span> 💬 Student chat is open — login and say hi!</div>
-      <div class="marquee-item"><span class="badge blue">AI</span> 🤖 Class AI now supports smart API mode.</div>
-    </div>
+  <!-- MARQUEE (live updates ticker — filled from real data by home.js) -->
+  <div class="marquee-strip" id="homeTicker" role="marquee" aria-label="Latest updates">
+    <div class="marquee-track" id="homeTickerTrack"></div>
   </div>
 
   <!-- LIVE STATS -->
@@ -310,11 +296,9 @@
   <section class="section section-alt no-contain" aria-label="Quick access">
     <div class="container">
       <div class="quick-rail" data-stagger>
-        <a href="chat.html" class="quick-link"><i class="fa-solid fa-message"></i> Chat</a>
-        <a href="polls.html" class="quick-link gold"><i class="fa-solid fa-check-to-slot"></i> Polls</a>
-        <a href="teachers.html" class="quick-link"><i class="fa-solid fa-user-tie"></i> Teachers</a>
+        <a href="pyqs.html" class="quick-link"><i class="fa-solid fa-file-pen"></i> PYQ Papers</a>
+        <a href="ai.html" class="quick-link"><i class="fa-solid fa-robot"></i> Class AI</a>
         <a href="extras.html" class="quick-link gold"><i class="fa-solid fa-wand-magic-sparkles"></i> Extras</a>
-        <a href="admin.html" class="quick-link"><i class="fa-solid fa-gear"></i> Admin</a>
       </div>
     </div>
   </section>

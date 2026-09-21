@@ -3,10 +3,9 @@
 <head>  <script>
     (function () {
       try {
-        var t = localStorage.getItem('aia_theme');
-        if (t && ['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) !== -1) {
-          document.documentElement.setAttribute('data-theme', t);
-        }
+        var t = localStorage.getItem('aia_theme') || 'luxury';
+        if (['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) === -1) t = 'luxury';
+        document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     })();
   </script>

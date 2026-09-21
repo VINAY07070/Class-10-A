@@ -26,6 +26,31 @@
     }, 1150);
   }
 
+  /* --- Live ticker: built from the same records the inner pages show,
+         so the home page never invents its own copy of the news. --- */
+  var track = document.getElementById('homeTickerTrack');
+  if (track) {
+    var items = [];
+    DataStore.getAnnouncements().slice(0, 3).forEach(function (a) {
+      if (a && a.title) items.push({ label: 'NEWS', text: a.title });
+    });
+    DataStore.getHomework().slice(0, 3).forEach(function (h) {
+      if (h && h.subject) items.push({ label: 'HOMEWORK', text: h.subject + (h.due_date ? ' · due ' + App.formatDate(h.due_date) : '') });
+    });
+    DataStore.getPolls().slice(0, 2).forEach(function (p) {
+      if (p && p.question) items.push({ label: 'POLL', text: p.question });
+    });
+    DataStore.getPyqs && DataStore.getPyqs().slice(0, 2).forEach(function (p) {
+      if (p && (p.title || p.subject)) items.push({ label: 'PYQ', text: p.title || p.subject });
+    });
+    if (!items.length) items.push({ label: 'WELCOME', text: 'Class 10-A Hub — everything for your class in one place.' });
+    /* the track is duplicated so the CSS marquee loops seamlessly */
+    var half = items.map(function (it) {
+      return '<div class="marquee-item"><span class="badge">' + App.escapeHtml(it.label) + '</span> ' + App.escapeHtml(it.text) + '</div>';
+    }).join('');
+    track.innerHTML = half + half;
+  }
+
   /* --- Announcement spotlight --- */
   var spot = document.getElementById('announcementSpotlight');
   if (spot) {

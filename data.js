@@ -682,10 +682,10 @@ var DataStore = (function () {
     var t;
     try { t = localStorage.getItem(THEME_KEY); } catch (e) {}
     if (t && THEMES.indexOf(t) !== -1) return t;
-    return 'glass';
+    return 'luxury';
   }
   function setTheme(t) {
-    if (THEMES.indexOf(t) === -1) t = 'glass';
+    if (THEMES.indexOf(t) === -1) t = 'luxury';
     try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
     document.documentElement.setAttribute('data-theme', t);
     if (!window.__aiaApplying) {
@@ -707,7 +707,7 @@ var DataStore = (function () {
         if (v) out[k] = JSON.parse(v);
       } catch (e) {}
     });
-    try { out.aia_theme = localStorage.getItem('aia_theme') || 'glass'; } catch (e) {}
+    try { out.aia_theme = localStorage.getItem('aia_theme') || 'luxury'; } catch (e) {}
     out._exported_at = new Date().toISOString();
     return JSON.stringify(out, null, 2);
   }

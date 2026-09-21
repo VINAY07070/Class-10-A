@@ -758,8 +758,8 @@
     if (!picker) return;
     var current = DataStore.getTheme();
     var themes = [
-      { id: 'glass', name: 'Glass', desc: 'Default dark glass', swatch: 'linear-gradient(135deg,#0d1428 0%,#1a2440 55%,#7c6cff 130%)' },
-      { id: 'luxury', name: 'Luxury', desc: 'Black & gold', swatch: 'linear-gradient(135deg,#0a0705 0%,#241505 60%,#f0b24b 140%)' },
+      { id: 'luxury', name: 'Luxury', desc: 'Default · black & gold', swatch: 'linear-gradient(135deg,#0a0705 0%,#241505 60%,#f0b24b 140%)' },
+      { id: 'glass', name: 'Glass', desc: 'Cool frosted blue', swatch: 'linear-gradient(135deg,#0d1428 0%,#1a2440 55%,#7c6cff 130%)' },
       { id: 'simple', name: 'Simple', desc: 'Clean & light', swatch: 'linear-gradient(135deg,#f4f6fb 0%,#dbe3f5 60%,#6c5ce7 140%)' },
       { id: 'midnight', name: 'Midnight', desc: 'Deep navy glow', swatch: 'linear-gradient(135deg,#020617 0%,#0b1530 60%,#3f7bff 140%)' },
       { id: 'neon', name: 'Neon', desc: 'Electric vibes', swatch: 'linear-gradient(135deg,#05030f 0%,#130a2e 55%,#00e5ff 130%,#ff2fd6 170%)' },
