@@ -70,6 +70,8 @@
   def('aia_theme', LWW); // note: stored as raw string, handled specially
   def('aia_homework', UNION, 300);
   def('aia_files', UNION, 120);
+  def('aia_pyqs', UNION, 400);
+  def('aia_blocks', MAP, 200);
   def('aia_announcements', UNION, 300);
   def('aia_test_scores', UNION, 600);
   def('aia_class_chat', UNION, 500);
@@ -105,6 +107,12 @@
       if (k === 'aia_theme') {
         try { localStorage.setItem('aia_theme', v); } catch (e) {}
         if (v) document.documentElement.setAttribute('data-theme', v);
+      } else if (k === 'aia_ai_config') {
+        /* never let a peer (or a stale snapshot) write a secret into the
+           synced config slot */
+        var cfg = (v && typeof v === 'object') ? Object.assign({}, v) : {};
+        delete cfg.apiKey; delete cfg.api_key; delete cfg.key;
+        rawSet(k, cfg);
       } else rawSet(k, v);
     } finally { window.__aiaApplying = false; }
   }

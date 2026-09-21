@@ -1,0 +1,262 @@
+/* ============================================================
+   PYQ PAPERS — page styles
+   Tabs, subject chips and paper cards. Kept in its own file so the
+   shared stylesheets stay small and every other page skips it.
+   ============================================================ */
+
+.pyq-tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.pyq-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, .12));
+  background: var(--card, rgba(255, 255, 255, .04));
+  color: var(--text-secondary, #b9c2d8);
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease, color .18s ease, background .18s ease;
+}
+
+.pyq-tab:hover { transform: translateY(-2px); }
+
+.pyq-tab.active {
+  border-color: var(--gold, #ffd889);
+  color: var(--gold, #ffd889);
+  background: color-mix(in srgb, var(--gold, #ffd889) 12%, transparent);
+}
+
+.pyq-filter {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.pyq-chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(255, 255, 255, .12));
+  background: transparent;
+  color: var(--text-secondary, #b9c2d8);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .18s ease, color .18s ease, background .18s ease;
+}
+
+.pyq-chip.active {
+  border-color: var(--gold, #ffd889);
+  color: #0b1020;
+  background: var(--gold, #ffd889);
+}
+
+.pyq-notice {
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  font-size: .87rem;
+  border: 1px solid var(--border, rgba(255, 255, 255, .12));
+  background: var(--card, rgba(255, 255, 255, .04));
+}
+
+.pyq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.pyq-card {
+  padding: 18px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pyq-card-top {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.pyq-icon {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--gold, #ffd889) 14%, transparent);
+  color: var(--gold, #ffd889);
+  font-size: 1.05rem;
+}
+
+.pyq-head { min-width: 0; }
+
+.pyq-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.pyq-meta {
+  margin: 4px 0 0;
+  font-size: .78rem;
+  color: var(--text-secondary, #b9c2d8);
+}
+
+.pyq-note {
+  margin: 0;
+  font-size: .82rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #b9c2d8);
+}
+
+.pyq-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.pyq-nofile {
+  font-size: .8rem;
+  color: var(--text-secondary, #b9c2d8);
+  font-style: italic;
+}
+
+/* Phones: one column, and the tab row scrolls sideways instead of wrapping
+   into a tall stack that pushes the papers off screen. */
+@media (max-width: 640px) {
+  .pyq-grid { grid-template-columns: 1fr; gap: 12px; }
+  .pyq-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .pyq-tabs::-webkit-scrollbar { display: none; }
+  .pyq-tab { flex: 0 0 auto; padding: 9px 14px; font-size: .82rem; }
+  .pyq-card { padding: 15px; }
+}
+
+/* ============================================================
+   PRIVATE CHAT thread (admin panel)
+   ============================================================ */
+.pv-thread {
+  max-height: 340px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, .12));
+  background: rgba(0, 0, 0, .18);
+  margin-bottom: 12px;
+}
+
+.pv-msg { display: flex; flex-direction: column; max-width: 82%; }
+.pv-mine { align-self: flex-end; align-items: flex-end; }
+.pv-theirs { align-self: flex-start; align-items: flex-start; }
+
+.pv-bubble {
+  padding: 9px 13px;
+  border-radius: 14px;
+  font-size: .88rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.pv-mine .pv-bubble {
+  background: color-mix(in srgb, var(--gold, #ffd889) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold, #ffd889) 35%, transparent);
+}
+
+.pv-theirs .pv-bubble {
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+
+.pv-time { font-size: .68rem; opacity: .55; margin-top: 3px; }
+
+.pv-compose { display: flex; gap: 8px; }
+.pv-compose input {
+  flex: 1;
+  padding: 10px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, .14));
+  background: rgba(0, 0, 0, .2);
+  color: inherit;
+  font: inherit;
+  font-size: .88rem;
+}
+
+/* ============================================================
+   BLOCKED banner (shown to the student)
+   ============================================================ */
+.blocked-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 8, 18, .93);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.blocked-card {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  padding: 30px 26px;
+  border-radius: 20px;
+  border: 1px solid rgba(248, 113, 113, .35);
+  background: rgba(30, 12, 16, .92);
+}
+
+.blocked-card .blocked-icon {
+  font-size: 2.4rem;
+  color: #f87171;
+  margin-bottom: 12px;
+}
+
+.blocked-card h2 { margin: 0 0 8px; font-size: 1.25rem; }
+
+.blocked-reason {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: .9rem;
+  line-height: 1.5;
+  text-align: left;
+  background: rgba(248, 113, 113, .1);
+  border: 1px solid rgba(248, 113, 113, .22);
+}
+
+.blocked-timer {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: .5px;
+  margin: 10px 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.blocked-note { font-size: .82rem; opacity: .7; line-height: 1.5; }
+

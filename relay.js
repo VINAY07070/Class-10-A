@@ -45,6 +45,7 @@
     aia_class_chat: 'cc', aia_comments: 'cm', aia_poll_votes: 'pv',
     aia_polls: 'pl', aia_student_profiles: 'sp', aia_subject_content: 'sc',
     aia_subject_photos: 'ph', aia_ai_config: 'ac', aia_theme: 'th',
+    aia_pyqs: 'pq', aia_blocks: 'bk',
     aia_presence: 'pr', aia_ai_log: 'ag', aia_chat_mode: 'cm2',
     aia_files: 'fl', aia_credentials_overrides: 'co',
     aia_class_chat_deleted: 'cd', aia_activity_log: 'al'
@@ -132,6 +133,7 @@
       else if (k === 'aia_subject_photos') v = trimPhotos(v);
       else if (k === 'aia_activity_log') v = capActivity(v);
       else if (k === 'aia_ai_log') return; /* too heavy for live */
+      else if (k === 'aia_ai_config') v = stripAiSecrets(v);
       var size = sk.length + v.length + 6;
       if (payloadBytes + size > MAX_BYTES) flush();
       payload[sk] = v;
@@ -139,6 +141,21 @@
     });
     flush();
     queue.forEach(post);
+  }
+
+  /* Defence in depth: even if a stale config blob still carries a key, it
+     must never leave the device. The relay room is public and readable by
+     anyone who knows the room name, so the key is removed here as well as
+     at the storage layer. */
+  function stripAiSecrets(jsonStr) {
+    try {
+      var cfg = JSON.parse(jsonStr);
+      if (cfg && typeof cfg === 'object') {
+        delete cfg.apiKey; delete cfg.api_key; delete cfg.key;
+        return JSON.stringify(cfg);
+      }
+      return '{}';
+    } catch (e) { return '{}'; }
   }
 
   function capChat(chatJson) {

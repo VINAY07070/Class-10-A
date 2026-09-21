@@ -134,6 +134,17 @@
     s += '<circle class="p-head" cx="60" cy="60" r="' + HEAD_R + '" fill="none" stroke="' + ink + '" stroke-width="' + w + '"/>';
     s += '<circle class="p-pupL" cx="54.5" cy="59.5" r="1.6" fill="' + ink + '"/>';
     s += '<circle class="p-pupR" cx="65.5" cy="59.5" r="1.6" fill="' + ink + '"/>';
+    /* Vinay wears sunglasses. They are a separate group so the blink logic
+       can hide the lenses instead of trying to squash them (a squashed
+       rectangle reads as broken art, not as a blink). Lenses sit exactly
+       over the pupils at rest so the wink/blink reveals the eyes beneath. */
+    if (isV) {
+      s += '<g class="p-shades" opacity="1">';
+      s += '<path d="M50 57.2 H70 V59.2 A5 5 0 0 1 65 64.2 H55 A5 5 0 0 1 50 59.2 Z" fill="' + ink + '" opacity=".92"/>';
+      s += '<path d="M50 57.2 H70" stroke="' + acc + '" stroke-width="1.2" stroke-linecap="round" opacity=".95"/>';
+      s += '<path d="M53 60.5 H58" stroke="' + acc + '" stroke-width="1" stroke-linecap="round" opacity=".7"/>';
+      s += '</g>';
+    }
     s += '<path class="p-mouth" d="M54 68 Q60 71.5 66 68" stroke="' + ink + '" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".85"/>';
     s += '<ellipse class="p-mouthOpen" cx="60" cy="69.5" rx="2.4" ry="3" fill="' + ink + '" opacity="0"/>';
     s += '</g>'; /* headG */
@@ -195,6 +206,7 @@
       headG: svg.querySelector('.p-headG'), head: svg.querySelector('.p-head'),
       neck: svg.querySelector('.p-neck'),
       pupL: svg.querySelector('.p-pupL'), pupR: svg.querySelector('.p-pupR'),
+      shades: svg.querySelector('.p-shades'),
       mouth: svg.querySelector('.p-mouth'), mouthOpen: svg.querySelector('.p-mouthOpen')
     };
     bindPointer(F);
@@ -232,7 +244,6 @@
       else if (kind === 'zzzbig') puff(c.x + rand(-10, 22), c.top - rand(0, 14), pick(['z', 'Z']), 'sm-zzz');
     }
   }
-  function zzz(F) { var c = figCenter(F); puff(c.x + 16, c.top - 4, 'z', 'sm-zzz'); }
 
   /* ---------------- speech bubble ---------------- */
   function say(F, text, ms) {
@@ -295,12 +306,6 @@
     if (F.mode !== 'idle') return;
     F.mode = 'dance'; F.t0 = performance.now(); F.dur = ms || 2600; F.onDone = null;
     F.smileT = 1;
-  }
-  function doYawn(F) {
-    if (!F || F.dragging || REDUCED) return;
-    if (F.mode !== 'idle') return;
-    F.mode = 'yawn'; F.t0 = performance.now(); F.dur = 3200; F.onDone = null;
-    F.mouthOpenT = 1;
   }
   function celebrate(key) {
     var F = figures[key || (Math.random() < 0.5 ? 'vinay' : 'nitin')];
@@ -415,6 +420,24 @@
   function doPoint(F, ms) { if (gesture(F, 'point', ms)) { F.smileT = 1; F.mouthOpenT = 0.2; } }
   function doNod(F, ms) { if (gesture(F, 'nod', ms)) { F.smileT = 0.9; } }
   function doShrug(F, ms) { if (gesture(F, 'shrug', ms)) { F.smileT = 0.5; F.mouthOpenT = 0.15; } }
+  /* A clean 360° pirouette on the spot. Reads as a happy "ta-da" beat and
+     costs nothing extra: it reuses extraSpin, the same rotation channel the
+     backflip already drives, so no new render path is needed. */
+  function doSpin(F, ms) {
+    if (!F || F.dragging || REDUCED) return;
+    if (F.mode !== 'idle') return;
+    F.mode = 'spin'; F.t0 = performance.now(); F.dur = ms || 1400; F.onDone = null;
+    F.smileT = 1;
+  }
+  /* A few small bounces that get lower each time. The arms rise slightly on
+     the way up, which is what makes it read as delight rather than as a
+     glitchy vertical hop. */
+  function doHop(F, reps) {
+    if (!F || F.dragging || REDUCED) return;
+    if (F.mode !== 'idle') return;
+    F.mode = 'hop'; F.t0 = performance.now(); F.dur = 1400; F.onDone = null;
+    F.hopReps = reps || 3; F.smileT = 1;
+  }
   function doCower(F, ms) { if (gesture(F, 'cower', ms)) { F.smileT = 0.2; F.mouthOpenT = 0.8; } }
 
   /* ---- the activity repertoire --------------------------------------
@@ -427,8 +450,6 @@
   function doPunch(F, ms) { if (gesture(F, 'punch', ms || 900)) { F.smileT = 0.85; F.mouthOpenT = 0.35; } }
   function doDuck(F, ms) { if (gesture(F, 'duck', ms || 900)) { F.smileT = 0.8; } }
   function doCartwheel(F, ms) { if (gesture(F, 'cartwheel', ms || 1500)) { F.smileT = 1; } }
-  function doPushup(F, ms) { if (gesture(F, 'pushup', ms || 2400)) { F.smileT = 0.7; } }
-  function doSleep(F, ms) { if (gesture(F, 'sleep', ms || 4200)) { F.smileT = 0.4; } }
   function doStretch(F, ms) { if (gesture(F, 'stretch', ms || 2400)) { F.smileT = 0.9; F.mouthOpenT = 0.4; } }
   function doCheer(F, ms) { if (gesture(F, 'cheer', ms || 2200)) { F.smileT = 1; F.mouthOpenT = 0.6; burst(F, 8, 'confetti'); } }
   function doBackflip(F) {
@@ -653,16 +674,15 @@
             doCartwheel(freeOne(), 1500);
           } else if (r < 0.80 && freeOne()) {
             doStretch(freeOne(), 2400);
-          } else if (r < 0.84 && freeOne()) {
-            var p1 = freeOne();
-            doPushup(p1, 2400);
-            burst(p1, 1, 'sweat');
-          } else if (r < 0.88 && freeOne()) {
-            var z1 = freeOne();
-            doSleep(z1, 4200);
-            zzz(z1);
-          } else if (r < 0.94) { maybeHighFive(); }
-          else if (freeOne()) { doYawn(freeOne()); }
+          } else if (r < 0.86 && freeOne()) {
+            /* an occasional big two-hand wave reads as friendlier than the
+               old nap/yawn beats, which looked like the mascots were bored */
+            doWave(freeOne(), 1700);
+          } else if (r < 0.92 && freeOne()) {
+            doSpin(freeOne(), 1400);
+          } else if (r < 0.96 && freeOne()) {
+            doHop(freeOne(), 3);
+          } else if (freeOne()) { doShrug(freeOne(), 1600); }
           /* rare ambient chatter */
           var now = performance.now();
           if (now - lastAmbient > 75000 && Math.random() < 0.35) {
@@ -747,15 +767,20 @@
       }
       F.phase += dt * 14;
       F.dizzy = Math.max(F.dizzy, 0.4);
-    } else if (F.mode === 'wave' || F.mode === 'dance' || F.mode === 'yawn' || F.mode === 'highfive' ||
+    } else if (F.mode === 'wave' || F.mode === 'dance' || F.mode === 'highfive' ||
                  F.mode === 'point' || F.mode === 'nod' || F.mode === 'shrug' || F.mode === 'cower' ||
                  F.mode === 'kick' || F.mode === 'punch' || F.mode === 'duck' || F.mode === 'cartwheel' ||
-                 F.mode === 'pushup' || F.mode === 'sleep' || F.mode === 'stretch' || F.mode === 'cheer' ||
+                 F.mode === 'stretch' || F.mode === 'cheer' ||
+                 F.mode === 'spin' || F.mode === 'hop' ||
                  F.mode === 'backflip') {
       p = clamp((now - F.t0) / F.dur, 0, 1);
       if (F.mode === 'dance' && Math.random() < dt * 3) burst(F, 1, 'notes');
-      if (F.mode === 'yawn' && Math.random() < dt * 1.4) zzz(F);
       if (F.mode === 'highfive') F.yOff = -14 * 4 * p * (1 - p);
+      if (F.mode === 'spin') F.extraSpin = p * Math.PI * 2;
+      if (F.mode === 'hop') {
+        var reps = F.hopReps || 3, hp = p * reps;
+        F.yOff = -26 * Math.abs(Math.sin(hp * Math.PI)) * (1 - 0.22 * Math.floor(hp));
+      }
       if (F.mode === 'backflip' && p > 0.1 && p < 0.9) F.yOff = -46 * Math.sin((p - 0.1) / 0.8 * Math.PI);
       if (p >= 1) {
         F.mode = 'idle'; F.yOff = 0; F.mouthOpenT = 0; F.extraSpin = 0;
@@ -801,7 +826,7 @@
 
     /* --- blink --- */
     if (now >= F.nextBlink) { F.blinkUntil = now + 130; F.nextBlink = now + rand(2200, 5200); }
-    var blinking = now < F.blinkUntil || F.mode === 'yawn';
+    var blinking = now < F.blinkUntil;
 
     /* --- gaze: cursor tracking + wander --- */
     var c = figCenter(F);
@@ -981,27 +1006,23 @@
       fL.x = 60 - 28 * Math.cos(spin); fL.y = 112 + 28 * Math.sin(spin);
       fR.x = 60 + 28 * Math.cos(spin); fR.y = 112 + 28 * Math.sin(spin);
       tilt = Math.sin(spin) * 0.3;
-    } else if (F.mode === 'pushup') {
-      /* plank down to the floor and back, arms bending in the middle */
-      var pu = clamp((now - F.t0) / F.dur, 0, 1);
-      var wave = (1 - Math.cos(pu * Math.PI * 4)) / 2;   /* four reps */
-      var drop = wave;
-      hip.x = 60; hip.y = 112 - 46 + 18 * drop; chest.y = 78 - 30 + 16 * drop;
-      headX = 60; headY = 60 - 24 + 14 * drop;
-      fL.y = GY; fR.y = GY; fL.x = 56; fR.x = 64;        /* feet planted */
-      hL.x = 44; hL.y = GY - 24 + 14 * drop;
-      hR.x = 76; hR.y = GY - 24 + 14 * drop;
-      tilt = -0.5;
-      if (F.smileT < 0.6) F.smileT = 0.7;
-    } else if (F.mode === 'sleep') {
-      /* curled up on the floor, slow breathing, z's drifting up */
-      var sl = Math.sin(t * 1.2) * 1.4;
-      hip.x = 58; hip.y = 132 + sl; chest.x = 50; chest.y = 136 + sl;
-      headX = 40; headY = 140 + sl;
-      hL.x = 48; hL.y = 142; hR.x = 56; hR.y = 146;
-      fL.x = 70; fL.y = GY; fR.x = 76; fR.y = GY - 2;
-      tilt = -0.9;
-      if (Math.random() < dt * 1.1) burst(F, 1, 'zzzbig');
+    } else if (F.mode === 'spin') {
+      /* pirouette: a slight rise and sway so it reads as a dance turn
+         rather than a rigid rotation about the spine */
+      var sp = Math.sin(clamp((now - F.t0) / F.dur, 0, 1) * Math.PI);
+      hip.y -= 3 * sp; chest.y -= 4 * sp; headY -= 4 * sp;
+      hL.x = 44 - 6 * sp; hL.y = 92 - 6 * sp;
+      hR.x = 76 + 6 * sp; hR.y = 92 - 6 * sp;
+      tilt = Math.sin(now / 120) * 0.05 * sp;
+      if (F.smileT < 0.9) F.smileT = 1;
+    } else if (F.mode === 'hop') {
+      /* arms lift a little on each bounce */
+      var hpr = (F.hopReps || 3);
+      var hphase = clamp((now - F.t0) / F.dur, 0, 1) * hpr;
+      var up = Math.abs(Math.sin(hphase * Math.PI));
+      hL.x = 52 - 5 * up; hL.y = 98 - 10 * up;
+      hR.x = 68 + 5 * up; hR.y = 98 - 10 * up;
+      if (F.smileT < 0.9) F.smileT = 1;
     } else if (F.mode === 'stretch') {
       /* yawn-stretch: reach both arms overhead, rise onto the toes */
       var st = Math.sin(clamp((now - F.t0) / F.dur, 0, 1) * Math.PI);
@@ -1037,9 +1058,6 @@
         hip.y -= 40 * tuck;
       }
       if (bp >= 1) burst(F, 6, 'dust');
-    } else if (F.mode === 'yawn') {
-      hip.y += 4; chest.y += 4; headY += 9; tilt = 0.12;
-      hL.y += 7; hR.y += 7; fL.x -= 2; fR.x += 2;
     } else { /* idle — breathe, sway, micro-life */
       hip.x += sway; chest.x += sway * 1.2 + F.gaze.x * 2; headX += sway * 1.3 + F.gaze.x * 4.5;
       var b2 = (br * 0.5 + 0.5);
@@ -1113,6 +1131,14 @@
     var lid = blinking ? 'translate(0 ' + lidY + ') scale(1 ' + blinkSquash + ') translate(0 -' + lidY + ')' : null;
     if (lid) { E.pupL.setAttribute('transform', lid); E.pupR.setAttribute('transform', lid); }
     else { E.pupL.removeAttribute('transform'); E.pupR.removeAttribute('transform'); }
+    /* Sunglasses ride the head: they inherit the headG transform, so they
+       only need to track the gaze offset and get out of the way on a blink
+       (hiding the lenses is what sells the blink — squashing them would
+       just look like broken artwork). */
+    if (E.shades) {
+      E.shades.setAttribute('transform', 'translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ')');
+      E.shades.setAttribute('opacity', blinking ? '0' : '1');
+    }
     /* mouth: smile <-> frown morph + open (surprise/yawn) */
     var sm = clamp(F.smile, -1, 1);
     E.mouth.setAttribute('d', 'M55 53 Q60 ' + (53 + sm * 4.2).toFixed(1) + ' 65 53');
@@ -1278,9 +1304,9 @@
         case 'cartwheel': doCartwheel(F, 1500); return true;
         case 'backflip': doBackflip(F); return true;
         case 'stretch': doStretch(F, 2400); return true;
+        case 'spin': doSpin(F, 1400); return true;
+        case 'hop': doHop(F, 3); return true;
         case 'cheer': doCheer(F, 2200); return true;
-        case 'pushup': doPushup(F, 2400); return true;
-        case 'sleep': doSleep(F, 4200); return true;
         case 'highfive': maybeHighFive(); return true;
         case 'fight': return startFight();
         default: return false;
@@ -1288,7 +1314,7 @@
     },
     /* full list of activities, for the admin debug view */
     activities: ['wave', 'jump', 'dance', 'kick', 'punch', 'cartwheel', 'backflip',
-                 'stretch', 'cheer', 'pushup', 'sleep', 'highfive', 'fight'],
+                 'stretch', 'cheer', 'spin', 'hop', 'highfive', 'fight'],
     /* Introspection for tests and for the admin debug view: what each mascot
        is doing right now. Read-only. */
     state: function () {

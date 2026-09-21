@@ -192,6 +192,7 @@ var App = (function () {
       { href: 'subjects.html', icon: 'fa-book-open', label: 'Subjects' },
       { href: 'chat.html', icon: 'fa-message', label: 'Chat' },
       { href: 'homework.html', icon: 'fa-pen-to-square', label: 'Homework' },
+      { href: 'pyqs.html', icon: 'fa-file-pen', label: 'PYQ Papers' },
       { href: 'scores.html', icon: 'fa-chart-column', label: 'Scores' },
       { href: 'announcements.html', icon: 'fa-bullhorn', label: 'News' },
       { href: 'polls.html', icon: 'fa-square-poll-vertical', label: 'Polls' },

@@ -812,6 +812,213 @@
     });
   }
 
+  /* ---------- PYQ papers ---------- */
+  function fillPyqSelect() {
+    var sel = document.getElementById('pyqSubject');
+    if (!sel) return;
+    var subjects = (DataStore.getSubjects() || []).map(function (s) { return s && s.name; }).filter(Boolean);
+    sel.innerHTML = subjects.map(function (s) {
+      return '<option value="' + App.escapeHtml(s) + '">' + App.escapeHtml(s) + '</option>';
+    }).join('');
+  }
+
+  function renderPyqAdmin() {
+    var el = document.getElementById('pyqAdminList');
+    if (!el) return;
+    var list = DataStore.getPyqs() || [];
+    if (!list.length) {
+      el.innerHTML = '<p class="text-muted" style="font-size:.85rem">No papers uploaded yet. Add the first one above.</p>';
+      return;
+    }
+    var KIND_LABEL = { 'half-yearly': 'Half Yearly', 'yearly': 'Yearly', 'practice': 'Practice' };
+    var rows = list.slice().reverse().map(function (p) {
+      return '<tr><td>' + App.escapeHtml(p.subject || '—') + '</td>' +
+        '<td>' + App.escapeHtml(KIND_LABEL[p.kind] || p.kind || '—') + '</td>' +
+        '<td>' + App.escapeHtml(p.year || '—') + '</td>' +
+        '<td>' + App.escapeHtml(p.title) + '</td>' +
+        '<td><button class="btn btn-secondary btn-sm" data-del-pyq="' + App.escapeHtml(p.id) + '">' +
+        '<i class="fa-solid fa-trash"></i></button></td></tr>';
+    }).join('');
+    el.innerHTML = '<table class="admin-table"><thead><tr><th>Subject</th><th>Type</th><th>Year</th><th>Title</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    el.querySelectorAll('[data-del-pyq]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        DataStore.removePyq(b.getAttribute('data-del-pyq'));
+        renderPyqAdmin();
+        App.showToast('Paper removed', 'info');
+      });
+    });
+  }
+
+  function pyqValue(urlId, fileId) {
+    var fileEl = document.getElementById(fileId);
+    var urlEl = document.getElementById(urlId);
+    var url = urlEl && urlEl.value.trim();
+    var file = fileEl && fileEl.files && fileEl.files[0];
+    if (file) {
+      if (file.size > 4 * 1024 * 1024) return Promise.reject(new Error(file.name + ' is over 4 MB — the free relay caps files at 4 MB.'));
+      return window.AiaFiles.upload(file, { name: file.name }).then(function (res) {
+        if (!res || !res.ok) throw new Error(res && res.error ? res.error : 'Upload failed');
+        return res.file.url;
+      });
+    }
+    return Promise.resolve(url || '');
+  }
+
+  function addPyq() {
+    var statusEl = document.getElementById('pyqUploadStatus');
+    var title = document.getElementById('pyqTitle').value.trim();
+    if (!title) { App.showToast('Give the paper a title first', 'error'); return; }
+    var kind = document.getElementById('pyqKind').value;
+    var subject = document.getElementById('pyqSubject').value;
+    var year = document.getElementById('pyqYear').value.trim();
+    var note = document.getElementById('pyqNote').value.trim();
+    if (statusEl) statusEl.textContent = 'Uploading…';
+    Promise.all([pyqValue('pyqUrl', 'pyqFile'), pyqValue('pyqSolUrl', 'pyqSolFile')])
+      .then(function (urls) {
+        var rec = {
+          title: title, kind: kind, subject: subject, year: year, note: note,
+          url: urls[0] || '', solutionUrl: urls[1] || '',
+          type: (document.getElementById('pyqFile').files[0] || {}).type || ''
+        };
+        DataStore.addPyq(rec);
+        try { document.dispatchEvent(new CustomEvent('aia-local-write', { detail: { key: 'aia_pyqs' } })); } catch (e) {}
+        document.getElementById('pyqTitle').value = '';
+        document.getElementById('pyqYear').value = '';
+        document.getElementById('pyqNote').value = '';
+        document.getElementById('pyqUrl').value = '';
+        document.getElementById('pyqSolUrl').value = '';
+        document.getElementById('pyqFile').value = '';
+        document.getElementById('pyqSolFile').value = '';
+        if (statusEl) statusEl.textContent = '';
+        renderPyqAdmin();
+        App.showToast('Paper added 📄', 'success');
+      })
+      .catch(function (err) {
+        if (statusEl) statusEl.textContent = '';
+        App.showToast(err.message || 'Could not add the paper', 'error');
+      });
+  }
+
+  /* ---------- private chat (admin side) ---------- */
+  var pvStop = null;
+  var pvCurrent = '';
+
+  function pvUsernameFor(name) {
+    var creds = DataStore.getEffectiveCredentials ? DataStore.getEffectiveCredentials() : DataStore.getCredentials();
+    var c = (creds || []).find(function (x) { return x && x.name === name; });
+    return c ? c.username : '';
+  }
+
+  function renderPvThread() {
+    var el = document.getElementById('pvThread');
+    if (!el) return;
+    var msgs = pvCurrent ? DataStore.getPrivateChat(pvCurrent) : [];
+    if (!msgs.length) {
+      el.innerHTML = '<p class="text-muted" style="font-size:.85rem;margin:0">No messages yet. Say hello 👋</p>';
+      return;
+    }
+    el.innerHTML = msgs.map(function (m) {
+      var mine = m.role === 'admin';
+      return '<div class="pv-msg ' + (mine ? 'pv-mine' : 'pv-theirs') + '">' +
+        '<div class="pv-bubble">' + App.escapeHtml(m.text || '') + '</div>' +
+        '<div class="pv-time">' + App.escapeHtml(window.App && App.timeAgo ? App.timeAgo(m.at) : '') + '</div></div>';
+    }).join('');
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function pvSelect(name) {
+    if (pvStop) { pvStop(); pvStop = null; }
+    pvCurrent = pvUsernameFor(name);
+    if (!pvCurrent) { renderPvThread(); return; }
+    renderPvThread();
+    var warn = document.getElementById('pvWarn');
+    if (warn) {
+      warn.innerHTML = window.AiaPrivate && window.AiaPrivate.secure()
+        ? '<i class="fa-solid fa-lock"></i> Encrypted in transit. Only you and this student can read it.'
+        : '<i class="fa-solid fa-triangle-exclamation"></i> This browser cannot encrypt — messages are sent encoded but not encrypted. Use HTTPS for full protection.';
+    }
+    if (window.AiaPrivate) {
+      var known = {};
+      DataStore.getPrivateChat(pvCurrent).forEach(function (m) { if (m && m.id) known[m.id] = 1; });
+      pvStop = window.AiaPrivate.listen(pvCurrent, function (batch) {
+        var changed = false;
+        batch.forEach(function (m) {
+          if (m.role === 'admin') return;    /* our own outbound messages are already stored */
+          DataStore.addPrivateMessage(pvCurrent, { id: m.id, text: m.text, role: 'student', name: m.name, at: m.at });
+          changed = true;
+        });
+        if (changed) renderPvThread();
+      }, { known: known, since: '48h' });
+    }
+  }
+
+  function pvSend() {
+    var input = document.getElementById('pvInput');
+    var text = input.value.trim();
+    if (!text || !pvCurrent) return;
+    input.value = '';
+    var msg = { text: text, role: 'admin', name: DataStore.getSession() ? DataStore.getSession().name : 'Admin', at: new Date().toISOString() };
+    DataStore.addPrivateMessage(pvCurrent, msg);
+    renderPvThread();
+    if (window.AiaPrivate) {
+      window.AiaPrivate.send(pvCurrent, msg).catch(function () {
+        App.showToast('Message saved locally but could not be sent right now', 'info');
+      });
+    }
+  }
+
+  /* ---------- block users ---------- */
+  function renderBlocked() {
+    var el = document.getElementById('blockedList');
+    if (!el) return;
+    var map = DataStore.getBlocks ? DataStore.getBlocks() : {};
+    var keys = Object.keys(map || {});
+    if (!keys.length) {
+      el.innerHTML = '<p class="text-muted" style="font-size:.85rem">Nobody is blocked right now.</p>';
+      return;
+    }
+    var rows = keys.map(function (k) {
+      var b = map[k];
+      var left = b.until ? DataStore.timeUntil(b.until) : 'Until unblocked';
+      return '<tr><td>' + App.escapeHtml(b.username || k) + '</td>' +
+        '<td>' + App.escapeHtml(b.reason || '—') + '</td>' +
+        '<td>' + App.escapeHtml(String(left)) + '</td>' +
+        '<td><button class="btn btn-secondary btn-sm" data-unblock="' + App.escapeHtml(b.username || k) + '">' +
+        '<i class="fa-solid fa-unlock"></i> Unblock</button></td></tr>';
+    }).join('');
+    el.innerHTML = '<table class="admin-table"><thead><tr><th>Student</th><th>Reason</th><th>Ends</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    el.querySelectorAll('[data-unblock]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        DataStore.unblockUser(b.getAttribute('data-unblock'));
+        try { document.dispatchEvent(new CustomEvent('aia-local-write', { detail: { key: 'aia_blocks' } })); } catch (e) {}
+        renderBlocked();
+        App.showToast('User unblocked ✓', 'success');
+      });
+    });
+  }
+
+  function doBlock() {
+    var name = document.getElementById('blkStudent').value;
+    var username = pvUsernameFor(name) || name;
+    var reason = document.getElementById('blkReason').value.trim();
+    var dur = document.getElementById('blkDuration').value;
+    if (!username) { App.showToast('Pick a student first', 'error'); return; }
+    if (!reason) { App.showToast('A reason is required — the student will see it', 'error'); return; }
+    var until = null;
+    if (dur === 'custom') {
+      var hours = parseFloat(document.getElementById('blkCustomHours').value);
+      if (!hours || hours <= 0) { App.showToast('Enter how many hours', 'error'); return; }
+      until = Date.now() + hours * 3600000;
+    } else if (dur !== 'forever') {
+      until = Date.now() + parseInt(dur, 10);
+    }
+    DataStore.blockUser(username, reason, until, DataStore.getSession() ? DataStore.getSession().name : 'admin');
+    try { document.dispatchEvent(new CustomEvent('aia-local-write', { detail: { key: 'aia_blocks' } })); } catch (e) {}
+    document.getElementById('blkReason').value = '';
+    renderBlocked();
+    App.showToast(name.split(' ')[0] + ' blocked', 'success');
+  }
+
   /* live: refresh lists when synced data arrives */
   var syncT = 0;
   window.__aiaRefresh = function () {
@@ -837,9 +1044,42 @@
     renderUserStats();
     initCreds();
     renderThemePicker();
+    /* new admin sections */
+    fillPyqSelect();
+    renderPyqAdmin();
+    renderBlocked();
+    var pvSel = document.getElementById('pvStudent');
+    if (pvSel) {
+      var names = (DataStore.getStudents ? DataStore.getStudents() : []) || [];
+      pvSel.innerHTML = names.map(function (n) {
+        return '<option value="' + App.escapeHtml(n) + '">' + App.escapeHtml(n) + '</option>';
+      }).join('');
+      pvSel.addEventListener('change', function () { pvSelect(pvSel.value); });
+      if (names.length) pvSelect(names[0]);
+    }
+    var blkSel = document.getElementById('blkStudent');
+    if (blkSel) {
+      var names2 = (DataStore.getStudents ? DataStore.getStudents() : []) || [];
+      blkSel.innerHTML = names2.map(function (n) {
+        return '<option value="' + App.escapeHtml(n) + '">' + App.escapeHtml(n) + '</option>';
+      }).join('');
+    }
   }
 
   bindAdds();
+  var addPyqBtn = document.getElementById('addPyqBtn');
+  if (addPyqBtn) addPyqBtn.addEventListener('click', addPyq);
+  var pvSendBtn = document.getElementById('pvSendBtn');
+  if (pvSendBtn) pvSendBtn.addEventListener('click', pvSend);
+  var pvInputEl = document.getElementById('pvInput');
+  if (pvInputEl) pvInputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') pvSend(); });
+  var blockBtn = document.getElementById('blockBtn');
+  if (blockBtn) blockBtn.addEventListener('click', doBlock);
+  var blkDur = document.getElementById('blkDuration');
+  if (blkDur) blkDur.addEventListener('change', function () {
+    var wrap = document.getElementById('blkCustomWrap');
+    if (wrap) wrap.style.display = blkDur.value === 'custom' ? 'block' : 'none';
+  });
   injectSyncCard();
   checkAuth();
 })();

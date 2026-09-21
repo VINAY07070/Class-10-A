@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('aia_theme');
+        if (t && ['glass','luxury','simple','midnight','neon','sunset','ocean','royal'].indexOf(t) !== -1) {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#070b16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>AIA Class 10-A Hub — PYQ Papers</title>
+  <meta name="description" content="RBSE Class 10 previous year papers, half-yearly and yearly, plus practice papers.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/stickmen.css">
+  <link rel="stylesheet" href="css/themes.css">
+  <link rel="stylesheet" href="css/pyq.css">
+
+  <script src="perf.js"></script>
+</head>
+<body>
+  <div id="navbar-placeholder"></div>
+  <div id="gate-placeholder"></div>
+
+  <header class="page-header">
+    <div class="container">
+      <div class="page-icon"><i class="fa-solid fa-file-pen"></i></div>
+      <h1 class="heading-lg text-gold reveal">PYQ Papers</h1>
+      <p class="reveal reveal-delay-1">Previous year question papers for every subject — half-yearly, yearly and practice sets.</p>
+    </div>
+  </header>
+
+  <section class="section" style="padding-top:0">
+    <div class="container">
+
+      <div class="pyq-tabs reveal" role="tablist" aria-label="Paper type">
+        <button class="pyq-tab active" data-kind="half-yearly" role="tab" aria-selected="true">
+          <i class="fa-solid fa-file-lines"></i> Half Yearly
+        </button>
+        <button class="pyq-tab" data-kind="yearly" role="tab" aria-selected="false">
+          <i class="fa-solid fa-graduation-cap"></i> Yearly
+        </button>
+        <button class="pyq-tab" data-kind="practice" role="tab" aria-selected="false">
+          <i class="fa-solid fa-dumbbell"></i> Practice Papers
+        </button>
+      </div>
+
+      <div class="pyq-filter reveal" id="pyqFilter">
+        <button class="pyq-chip active" data-subject="all">All subjects</button>
+      </div>
+
+      <div id="pyqNotice" class="pyq-notice" style="display:none"></div>
+
+      <div class="pyq-grid" id="pyqGrid"></div>
+
+      <div id="pyqEmpty" class="empty-state" style="display:none">
+        <div class="empty-icon">📄</div>
+        <h3 class="heading-sm" id="pyqEmptyTitle">No papers here yet</h3>
+        <p id="pyqEmptyBody">Papers uploaded by the class admin will appear here.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="data/seed.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/stickmen.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/pyqs.js"></script>
+</body>
+</html>

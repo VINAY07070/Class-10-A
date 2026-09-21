@@ -25,10 +25,17 @@ var DataStore = (function () {
     classChat: 'aia_class_chat',
     classChatDeleted: 'aia_class_chat_deleted',
     files: 'aia_files',
+    pyqs: 'aia_pyqs',
+    blocks: 'aia_blocks',
     aiLog: 'aia_ai_log',
     activityLog: 'aia_activity_log',
     presence: 'aia_presence',
     aiConfig: 'aia_ai_config',
+    /* The AI API key is a SECRET. It lives in its own key that is
+       deliberately absent from every sync list (sync-bridge.js SYNC_DEFS,
+       relay.js SHORT, the export/import sets) so it can never reach the
+       shared relay room or another device. */
+    aiKey: 'aia_ai_key',
     subjectContent: 'aia_subject_content',
     subjectPhotos: 'aia_subject_photos',
     githubData: 'aia_github_data'
@@ -349,6 +356,116 @@ var DataStore = (function () {
     return gone.length;
   }
 
+  /* ---------- PYQ library (previous-year question papers) ----------
+     Papers are contributed by the admin (or a teacher) as file links, so
+     nothing here is invented: the section renders exactly what has been
+     uploaded and shows an honest empty state until then. `kind` is one of
+     'half-yearly' | 'yearly' | 'practice'. */
+  function getPyqs() { return _get(KEYS.pyqs, []); }
+  function addPyq(p) {
+    if (!p || !p.title) return null;
+    if (!p.id) p.id = _uid('pyq');
+    if (!p.at) p.at = new Date().toISOString();
+    var l = getPyqs().filter(function (x) { return x && x.id !== p.id; });
+    l.push(p);
+    if (l.length > 400) l = l.slice(-400);
+    _set(KEYS.pyqs, l);
+    return p;
+  }
+  function removePyq(id) {
+    if (!id) return;
+    var l = getPyqs();
+    var out = l.filter(function (x) { return !x || x.id !== id; });
+    if (out.length === l.length) return;
+    _set(KEYS.pyqs, out);
+  }
+
+  /* ---------- private chat (admin <-> one student) ----------
+     Stored per student under its own key so a thread only ever reaches the
+     two people in it. `withUser` is the student's username. */
+  function privateKey(username) { return 'aia_private_chat_' + username; }
+  function getPrivateChat(username) {
+    if (!username) return [];
+    return _get(privateKey(username), []);
+  }
+  function addPrivateMessage(username, msg) {
+    if (!username || !msg) return [];
+    var l = getPrivateChat(username);
+    if (!msg.id) msg.id = _uid('pm');
+    if (!msg.at) msg.at = new Date().toISOString();
+    l = l.filter(function (m) { return m && m.id !== msg.id; });
+    l.push(msg);
+    if (l.length > 300) l = l.slice(-300);
+    _set(privateKey(username), l);
+    return l;
+  }
+
+  /* ---------- user blocks (admin action) ----------
+     A block carries a reason and an expiry, so the blocked student sees
+     exactly why and for how long. `until = null` means indefinite. */
+  function getBlocks() { return _get(KEYS.blocks, {}); }
+  function setBlocks(map) { return _set(KEYS.blocks, map || {}); }
+  function getBlock(username) {
+    if (!username) return null;
+    var b = getBlocks()[String(username).toLowerCase()];
+    if (!b) return null;
+    /* an expired block cleans itself up on read */
+    if (b.until && Date.now() > b.until) {
+      var m = getBlocks(); delete m[String(username).toLowerCase()]; setBlocks(m);
+      return null;
+    }
+    return b;
+  }
+  function blockUser(username, reason, until, by) {
+    if (!username) return null;
+    var m = getBlocks();
+    var b = {
+      username: username, reason: String(reason || '').slice(0, 300),
+      until: until || null, at: new Date().toISOString(), by: by || 'admin'
+    };
+    m[String(username).toLowerCase()] = b;
+    setBlocks(m);
+    return b;
+  }
+  function unblockUser(username) {
+    if (!username) return false;
+    var m = getBlocks();
+    var k = String(username).toLowerCase();
+    if (!(k in m)) return false;
+    delete m[k];
+    setBlocks(m);
+    return true;
+  }
+  function isBlocked(username) { return !!getBlock(username); }
+
+  /* Human-readable time left on a block, e.g. "2 days 3 hours left". */
+  function timeUntil(ts) {
+    if (!ts) return 'Until unblocked';
+    var ms = ts - Date.now();
+    if (ms <= 0) return 'expired';
+    var s = Math.floor(ms / 1000);
+    var d = Math.floor(s / 86400); s -= d * 86400;
+    var h = Math.floor(s / 3600); s -= h * 3600;
+    var m = Math.floor(s / 60);
+    if (d) return d + (d === 1 ? ' day ' : ' days ') + h + (h === 1 ? ' hour left' : ' hours left');
+    if (h) return h + (h === 1 ? ' hour ' : ' hours ') + m + (m === 1 ? ' minute left' : ' minutes left');
+    return m + (m === 1 ? ' minute left' : ' minutes left');
+  }
+
+  /* Same, as a short countdown for the blocked screen timer. */
+  function blockCountdown(ts) {
+    if (!ts) return 'no end date';
+    var ms = ts - Date.now();
+    if (ms <= 0) return '0s';
+    var s = Math.floor(ms / 1000);
+    var d = Math.floor(s / 86400); s -= d * 86400;
+    var h = Math.floor(s / 3600); s -= h * 3600;
+    var m = Math.floor(s / 60); s -= m * 60;
+    if (d) return d + 'd ' + h + 'h ' + m + 'm';
+    if (h) return h + 'h ' + m + 'm ' + s + 's';
+    return m + 'm ' + s + 's';
+  }
+
   /* ---------- shared files (photos, PDFs, docs) ---------- */
   /* Only lightweight metadata lives in localStorage: the bytes are uploaded
      to the shared relay and referenced by URL, so a phone never fills up. */
@@ -493,10 +610,26 @@ var DataStore = (function () {
   }
 
   /* ---------- AI config ---------- */
+  /* The config object itself is synced (mode, model, prompt…) but the API
+     key is stripped and kept in its own device-local key. `getAiConfig()`
+     reassembles the two so callers are unchanged, and anything reading the
+     raw synced value can never see the secret. */
+  function getAiKey() { return _get(KEYS.aiKey, ''); }
+  function setAiKey(k) { return _set(KEYS.aiKey, String(k || '')); }
   function getAiConfig() {
-    return _get(KEYS.aiConfig, { mode: 'local', apiKey: '', systemPrompt: 'You are Class AI, a friendly study assistant for AIA Class 10-A students. Answer clearly and helpfully.', model: 'gpt-4o-mini', baseUrl: 'https://api.openai.com/v1', temperature: 0.7 });
+    var cfg = _get(KEYS.aiConfig, { mode: 'local', apiKey: '', systemPrompt: 'You are Class AI, a friendly study assistant for AIA Class 10-A students. Answer clearly and helpfully.', model: 'gpt-4o-mini', baseUrl: 'https://api.openai.com/v1', temperature: 0.7 });
+    cfg = Object.assign({}, cfg);
+    /* older saves may still carry a key in the synced blob — migrate it out
+       so a previously exposed key stops being published from now on */
+    if (cfg.apiKey) { if (!getAiKey()) setAiKey(cfg.apiKey); delete cfg.apiKey; _set(KEYS.aiConfig, cfg); }
+    cfg.apiKey = getAiKey();
+    return cfg;
   }
-  function setAiConfig(cfg) { _set(KEYS.aiConfig, cfg); }
+  function setAiConfig(cfg) {
+    var clean = Object.assign({}, cfg || {});
+    if ('apiKey' in clean) { setAiKey(clean.apiKey); delete clean.apiKey; }
+    return _set(KEYS.aiConfig, clean);
+  }
 
   /* ---------- subjects ---------- */
   function getSubjects() {
@@ -651,6 +784,7 @@ var DataStore = (function () {
     getActivityLog: getActivityLog, logActivity: logActivity, logAction: logAction,
     getPresence: getPresence, getOnlineUsers: getOnlineUsers, getUserStats: getUserStats,
     getAiConfig: getAiConfig, setAiConfig: setAiConfig,
+    getAiKey: getAiKey, setAiKey: setAiKey,
     getSubjects: getSubjects,
     getSubjectContent: getSubjectContent, setSubjectContent: setSubjectContent, getSubjectContentFor: getSubjectContentFor,
     getSubjectPhotos: getSubjectPhotos, setSubjectPhoto: setSubjectPhoto, getSubjectPhotoList: getSubjectPhotoList,
@@ -658,6 +792,11 @@ var DataStore = (function () {
     getChatMode: getChatMode, setChatMode: setChatMode,
     getTheme: getTheme, setTheme: setTheme,
     getFiles: getFiles, addFile: addFile, removeFile: removeFile,
+    getPyqs: getPyqs, addPyq: addPyq, removePyq: removePyq,
+    getPrivateChat: getPrivateChat, addPrivateMessage: addPrivateMessage,
+    getBlock: getBlock, blockUser: blockUser, unblockUser: unblockUser,
+    isBlocked: isBlocked, getBlocks: getBlocks,
+    timeUntil: timeUntil, blockCountdown: blockCountdown,
     exportAll: exportAll, importAll: importAll,
     resetToSeed: resetToSeed,
     getStudentCount: getStudentCount, getTeacherCount: getTeacherCount,
