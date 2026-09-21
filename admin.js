@@ -403,7 +403,7 @@
     var list = DataStore.getAnnouncements();
     el.innerHTML = list.length ? '<h4 class="admin-list-title">Published announcements</h4>' + list.map(function (a, i) {
       return '<div class="admin-item"><div><strong>' + App.escapeHtml(a.title) + '</strong>' +
-        '<div class="text-muted" style="font-size:.8rem">' + App.escapeHtml(a.body.split('\n')[0]) + '</div>' +
+        '<div class="text-muted" style="font-size:.8rem">' + App.escapeHtml(String(a.body || '').split('\n')[0]) + '</div>' +
         '<div class="text-muted" style="font-size:.75rem">' + App.formatDate(a.date || a.created_at) + '</div></div>' +
         '<button class="btn btn-danger btn-sm" data-del="ann" data-idx="' + i + '"><i class="fa-solid fa-trash"></i></button></div>';
     }).join('') : '<div class="text-muted" style="text-align:center;padding:16px">No announcements yet.</div>';

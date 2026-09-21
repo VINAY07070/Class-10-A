@@ -116,7 +116,7 @@
     if (q.indexOf('homework') !== -1 || q.indexOf('hw') === 0 || q.indexOf('assignment') !== -1) {
       if (!k.homework.length) return 'No homework right now! 🎉 Enjoy the break.';
       return k.homework.map(function (h) {
-        return '• **' + h.subject + '** — ' + h.task.split('\n')[0] + (h.due_date ? ' (due ' + h.due_date + ')' : '');
+        return '• **' + h.subject + '** — ' + String(h.task || '').split('\n')[0] + (h.due_date ? ' (due ' + h.due_date + ')' : '');
       }).join('\n') + '\n\nCheck the Homework or Subject Hub page for details!';
     }
     if (q.indexOf('econom') !== -1) {

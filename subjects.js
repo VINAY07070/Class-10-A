@@ -56,7 +56,7 @@
       var hwHtml = hw.length
         ? hw.map(function (h) {
             return '<div class="subject-hw-item"><i class="fa-solid fa-pen-to-square"></i> ' +
-              App.escapeHtml(h.task.split('\n')[0]) +
+              App.escapeHtml(String(h.task || '').split('\n')[0]) +
               (h.due_date ? ' <span class="text-muted">· due ' + App.escapeHtml(h.due_date) + '</span>' : '') +
               '</div>';
           }).join('')
