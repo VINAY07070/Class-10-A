@@ -403,22 +403,33 @@ var DataStore = (function () {
   /* ---------- user blocks (admin action) ----------
      A block carries a reason and an expiry, so the blocked student sees
      exactly why and for how long. `until = null` means indefinite. */
-  function getBlocks() { return _get(KEYS.blocks, {}); }
+  /* Raw map, including cleared tombstones used for sync. */
+  function getBlocksRaw() { return _get(KEYS.blocks, {}); }
+  function getBlocks() {
+    var raw = getBlocksRaw(), out = {};
+    Object.keys(raw).forEach(function (k) {
+      var b = raw[k];
+      if (!b || b.cleared) return;
+      if (b.until && Date.now() > b.until) return;
+      out[k] = b;
+    });
+    return out;
+  }
   function setBlocks(map) { return _set(KEYS.blocks, map || {}); }
   function getBlock(username) {
     if (!username) return null;
-    var b = getBlocks()[String(username).toLowerCase()];
-    if (!b) return null;
-    /* an expired block cleans itself up on read */
+    var b = getBlocksRaw()[String(username).toLowerCase()];
+    if (!b || b.cleared) return null;
+    /* an expired block becomes a tombstone so every device drops it */
     if (b.until && Date.now() > b.until) {
-      var m = getBlocks(); delete m[String(username).toLowerCase()]; setBlocks(m);
+      unblockUser(b.username || username);
       return null;
     }
     return b;
   }
   function blockUser(username, reason, until, by) {
     if (!username) return null;
-    var m = getBlocks();
+    var m = getBlocksRaw();
     var b = {
       username: username, reason: String(reason || '').slice(0, 300),
       until: until || null, at: new Date().toISOString(), by: by || 'admin'
@@ -427,12 +438,14 @@ var DataStore = (function () {
     setBlocks(m);
     return b;
   }
+  /* Unblocking has to survive sync. Deleting the entry would let it come back
+     from a device that still holds the old copy, so we keep a tombstone with a
+     fresh timestamp — the merge picks the newest record per user. */
   function unblockUser(username) {
     if (!username) return false;
-    var m = getBlocks();
+    var m = getBlocksRaw();
     var k = String(username).toLowerCase();
-    if (!(k in m)) return false;
-    delete m[k];
+    m[k] = { username: username, cleared: true, at: new Date().toISOString() };
     setBlocks(m);
     return true;
   }
@@ -795,7 +808,7 @@ var DataStore = (function () {
     getPyqs: getPyqs, addPyq: addPyq, removePyq: removePyq,
     getPrivateChat: getPrivateChat, addPrivateMessage: addPrivateMessage,
     getBlock: getBlock, blockUser: blockUser, unblockUser: unblockUser,
-    isBlocked: isBlocked, getBlocks: getBlocks,
+    isBlocked: isBlocked, getBlocks: getBlocks, getBlocksRaw: getBlocksRaw,
     timeUntil: timeUntil, blockCountdown: blockCountdown,
     exportAll: exportAll, importAll: importAll,
     resetToSeed: resetToSeed,

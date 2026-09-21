@@ -65,9 +65,23 @@
             <span class="chat-online-dot"></span> <span class="text-muted" style="font-size:.8rem">Class 10-A room</span>
           </div>
           <div class="chat-app-actions">
+            <button class="btn btn-secondary btn-sm" id="chatPvToggle" style="display:none"><i class="fa-solid fa-user-shield"></i> <span>Private</span></button>
+            <button class="btn btn-secondary btn-sm" id="chatGuideBtn" title="Chat guidelines"><i class="fa-solid fa-circle-info"></i> <span>Guidelines</span></button>
             <button class="btn btn-secondary btn-sm" id="adminViewToggle" style="display:none"><i class="fa-solid fa-eye"></i> <span>Admin view</span></button>
             <button class="btn btn-secondary btn-sm" id="clearMyChatBtn"><i class="fa-solid fa-broom"></i> Clear my chat</button>
             <button class="btn btn-secondary btn-sm" id="chatLogoutBtn"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+          </div>
+        </div>
+        <!-- private thread with the admin: only ever visible to this student -->
+        <div class="chat-private" id="chatPrivate" style="display:none">
+          <div class="chat-private-bar">
+            <i class="fa-solid fa-lock"></i> Private chat with Admin — only you two can see this
+            <button class="pv-close" id="chatPvClose" aria-label="Close private chat"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="chat-messages pv-thread" id="chatPvMessages"></div>
+          <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chatPvInput" placeholder="Message the admin privately..." autocomplete="off" maxlength="500">
+            <button class="chat-send-btn" id="chatPvSend" aria-label="Send private message"><i class="fa-solid fa-paper-plane"></i></button>
           </div>
         </div>
         <div class="chat-messages" id="chatMessages"></div>
@@ -83,6 +97,28 @@
   </section>
 
   <div id="footer-placeholder"></div>
+
+  <!-- First-visit chat guidelines. Shown once per browser, reopenable any time
+       from the Guidelines button in the chat header. -->
+  <div class="guide-overlay" id="chatGuideOverlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+    <div class="guide-modal glass-card">
+      <div class="guide-head">
+        <span class="guide-badge"><i class="fa-solid fa-handshake-angle"></i></span>
+        <h3 class="heading-md" id="guideTitle">Class Chat Guidelines</h3>
+        <p class="text-muted" style="font-size:.85rem;margin:6px 0 0">A quick read so the room stays friendly for everyone.</p>
+      </div>
+      <ul class="guide-list">
+        <li><i class="fa-solid fa-heart"></i><div><strong>Be kind.</strong> No bullying, name-calling or personal attacks — ever.</div></li>
+        <li><i class="fa-solid fa-comment-slash"></i><div><strong>Keep it clean.</strong> No abusive, rude or inappropriate language or photos.</div></li>
+        <li><i class="fa-solid fa-graduation-cap"></i><div><strong>Stay on topic.</strong> This room is for class work: homework, doubts, papers and notes.</div></li>
+        <li><i class="fa-solid fa-user-secret"></i><div><strong>Keep private things private.</strong> Don't share anyone's phone number, address or password.</div></li>
+        <li><i class="fa-solid fa-bullhorn"></i><div><strong>No spam.</strong> Avoid repeated messages, forward chains and unnecessary links.</div></li>
+        <li><i class="fa-solid fa-scale-balanced"></i><div><strong>Admin can block.</strong> Breaking these rules can get your account blocked, with a reason and a duration.</div></li>
+      </ul>
+      <p class="guide-foot">By continuing you agree to follow these rules. Everyone can read the class chat, so write as if the whole class is listening.</p>
+      <button class="btn btn-primary" id="guideAcceptBtn" style="width:100%"><i class="fa-solid fa-check"></i> I understand</button>
+    </div>
+  </div>
 
   <script src="data/seed.js"></script>
   <script src="js/data.js"></script>

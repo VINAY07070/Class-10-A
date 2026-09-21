@@ -53,6 +53,8 @@ var App = (function () {
     window.addEventListener('aia-sync', function () {
       try { if (typeof window.__aiaRefresh === 'function') window.__aiaRefresh(); } catch (e) {}
       App.observeReveals(document);
+      /* a block may have just arrived from another device */
+      try { if (window.AiaBlock) window.AiaBlock.enforceCurrentSession(); } catch (e) {}
     });
     document.addEventListener('aia-data-change', function () {
       try { if (typeof window.__aiaRefresh === 'function') window.__aiaRefresh(); } catch (e) {}
@@ -72,6 +74,9 @@ var App = (function () {
 
     // already unlocked → skip the overlay
     if (DataStore.isUnlocked()) {
+      /* A block can arrive while a student is away, so re-check the restored
+         session before letting the site through. */
+      if (window.AiaBlock && window.AiaBlock.enforceCurrentSession()) return;
       overlay.classList.add('done');
       setTimeout(function () {
         var main = document.getElementById('mainSite');

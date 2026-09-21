@@ -3,6 +3,7 @@
   'use strict';
   function finish(auth) {
     if (!window.DataStore) return;
+    if (window.AiaBlock && window.AiaBlock.enforce(auth)) return;
     DataStore.setUnlocked(true);
     DataStore.setAdminAuth(auth.role === 'admin' ? 'full' : null);
     DataStore.setSession(auth);

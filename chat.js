@@ -47,11 +47,113 @@
       loginError.textContent = 'Wrong username or password. Ask the admin.';
       return;
     }
+    if (window.AiaBlock && window.AiaBlock.enforce(auth)) {
+      loginError.textContent = 'Your account is blocked. See the reason on screen.';
+      return;
+    }
     DataStore.setSession(auth);
     session = DataStore.getSession();
     enterChat();
     App.showToast('Welcome to the chat, ' + auth.name.split(' ')[0] + '! 💬', 'success');
   }
+
+  /* ---------- chat guidelines (first visit) ---------- */
+  var GUIDE_KEY = 'aia_chat_guide_seen';
+  var guideOverlay = document.getElementById('chatGuideOverlay');
+  var guideBtn = document.getElementById('chatGuideBtn');
+  var guideAccept = document.getElementById('guideAcceptBtn');
+
+  function guideSeen() {
+    try { return localStorage.getItem(GUIDE_KEY) === '1'; } catch (e) { return false; }
+  }
+  function markGuideSeen() {
+    try { localStorage.setItem(GUIDE_KEY, '1'); } catch (e) {}
+  }
+  function openGuide() { if (guideOverlay) guideOverlay.style.display = 'grid'; }
+  function closeGuide() { if (guideOverlay) guideOverlay.style.display = 'none'; }
+
+  if (guideAccept) guideAccept.addEventListener('click', function () {
+    markGuideSeen();
+    closeGuide();
+    App.showToast('Thanks! Enjoy the chat 💬', 'success');
+  });
+  if (guideBtn) guideBtn.addEventListener('click', openGuide);
+  if (guideOverlay) guideOverlay.addEventListener('click', function (e) {
+    if (e.target === guideOverlay) { markGuideSeen(); closeGuide(); }
+  });
+
+  /* ---------- private chat with the admin ---------- */
+  var pvToggle = document.getElementById('chatPvToggle');
+  var pvPanel = document.getElementById('chatPrivate');
+  var pvMessages = document.getElementById('chatPvMessages');
+  var pvInput = document.getElementById('chatPvInput');
+  var pvSendBtn = document.getElementById('chatPvSend');
+  var pvClose = document.getElementById('chatPvClose');
+  var pvStop = null;
+
+  function myUsername() { return session ? session.username : ''; }
+
+  function renderPv() {
+    if (!pvMessages || !session) return;
+    var msgs = DataStore.getPrivateChat(myUsername()) || [];
+    if (!msgs.length) {
+      pvMessages.innerHTML = '<p class="text-muted" style="font-size:.85rem;margin:0">No private messages yet. Only you and the admin can see this thread.</p>';
+      return;
+    }
+    pvMessages.innerHTML = msgs.map(function (m) {
+      var mine = m.role !== 'admin';
+      return '<div class="pv-msg ' + (mine ? 'pv-mine' : 'pv-theirs') + '">' +
+        '<div class="pv-bubble">' + App.escapeHtml(m.text || '') + '</div>' +
+        '<div class="pv-time">' + App.escapeHtml(window.App && App.timeAgo ? App.timeAgo(m.at) : '') + '</div></div>';
+    }).join('');
+    pvMessages.scrollTop = pvMessages.scrollHeight;
+  }
+
+  function openPv() {
+    if (!pvPanel || !session) return;
+    pvPanel.style.display = 'block';
+    renderPv();
+    if (window.AiaPrivate && !pvStop) {
+      var known = {};
+      (DataStore.getPrivateChat(myUsername()) || []).forEach(function (m) { if (m && m.id) known[m.id] = 1; });
+      pvStop = window.AiaPrivate.listen(myUsername(), function (batch) {
+        var changed = false;
+        batch.forEach(function (m) {
+          if (m.role !== 'admin') return;      /* our own outbound messages are already stored */
+          DataStore.addPrivateMessage(myUsername(), { id: m.id, text: m.text, role: 'admin', name: m.name, at: m.at });
+          changed = true;
+        });
+        if (changed) renderPv();
+      }, { known: known, since: '48h' });
+    }
+  }
+
+  function closePv() {
+    if (pvPanel) pvPanel.style.display = 'none';
+    if (pvStop) { pvStop(); pvStop = null; }
+  }
+
+  function sendPv() {
+    if (!pvInput || !session) return;
+    var text = pvInput.value.trim();
+    if (!text) return;
+    pvInput.value = '';
+    var msg = { text: text, role: 'student', name: session.name, at: new Date().toISOString() };
+    DataStore.addPrivateMessage(myUsername(), msg);
+    renderPv();
+    if (window.AiaPrivate) {
+      window.AiaPrivate.send(myUsername(), msg).catch(function () {
+        App.showToast('Saved here, but could not reach the admin right now', 'info');
+      });
+    }
+  }
+
+  if (pvToggle) pvToggle.addEventListener('click', function () {
+    if (pvPanel && pvPanel.style.display === 'block') closePv(); else openPv();
+  });
+  if (pvClose) pvClose.addEventListener('click', closePv);
+  if (pvSendBtn) pvSendBtn.addEventListener('click', sendPv);
+  if (pvInput) pvInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendPv(); });
 
   function enterChat() {
     if (!session) { loginBox.style.display = 'block'; appEl.style.display = 'none'; return; }
@@ -69,8 +171,12 @@
       } else adminToggle.style.display = 'none';
     }
     if (clearBtn) clearBtn.innerHTML = '<i class="fa-solid fa-broom"></i> Clear mine';
+    /* non-admins get a private line to the admin */
+    if (pvToggle) pvToggle.style.display = isAdmin ? 'none' : '';
     startLive();
     renderMessages(true);
+    /* first visit: read the rules before chatting */
+    if (!isAdmin && !guideSeen()) setTimeout(openGuide, 500);
   }
 
   function leaveChat() {
@@ -260,6 +366,8 @@
     window.addEventListener('aia-sync', onRemote);
     document.addEventListener('aia-data-change', function (e) {
       if (!e.detail || e.detail.key === '*' || e.detail.key === 'aia_class_chat') onRemote();
+      /* blocks arrive through the same channel */
+      if (e.detail && e.detail.key === 'aia_blocks' && window.AiaBlock) window.AiaBlock.enforceCurrentSession();
     });
     window.addEventListener('storage', function (e) {
       if (e.key === 'aia_class_chat') onRemote();

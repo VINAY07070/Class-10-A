@@ -1,0 +1,185 @@
+/* ============================================================
+   PRIVATE CHAT + CHAT GUIDELINES + BLOCKED SCREEN
+   Styles shared by chat.html and admin.html.
+   ============================================================ */
+
+/* ---------- private thread panel (inside the chat app) ---------- */
+.chat-private {
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, .12));
+  background: rgba(255, 216, 137, .04);
+}
+
+.chat-private-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--gold, #ffd889);
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, .1));
+}
+
+.chat-private-bar .pv-close {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  color: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.chat-private-bar .pv-close:hover { background: rgba(255, 255, 255, .1); }
+
+.chat-private .chat-messages { max-height: 260px; min-height: 120px; }
+
+/* ---------- guidelines modal ---------- */
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(5, 8, 18, .82);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  animation: guideFade .22s ease;
+}
+
+@keyframes guideFade { from { opacity: 0; } to { opacity: 1; } }
+
+.guide-modal {
+  width: 100%;
+  max-width: 470px;
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 26px 24px;
+  border-radius: 20px;
+  animation: guideRise .3s cubic-bezier(.2, .9, .3, 1.2);
+}
+
+@keyframes guideRise {
+  from { opacity: 0; transform: translateY(18px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.guide-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  font-size: 1.25rem;
+  margin-bottom: 10px;
+  color: var(--gold, #ffd889);
+  background: color-mix(in srgb, var(--gold, #ffd889) 15%, transparent);
+}
+
+.guide-head h3 { margin: 0; }
+
+.guide-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-list li {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  font-size: .87rem;
+  line-height: 1.5;
+}
+
+.guide-list li > i {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  font-size: .78rem;
+  color: var(--gold, #ffd889);
+  background: color-mix(in srgb, var(--gold, #ffd889) 12%, transparent);
+}
+
+.guide-foot {
+  font-size: .78rem;
+  line-height: 1.55;
+  opacity: .72;
+  margin: 0 0 16px;
+}
+
+/* ---------- blocked screen ---------- */
+.blocked-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(5, 8, 18, .95);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+}
+
+.blocked-card {
+  width: 100%;
+  max-width: 430px;
+  text-align: center;
+  padding: 32px 26px;
+  border-radius: 20px;
+  border: 1px solid rgba(248, 113, 113, .34);
+  background: linear-gradient(180deg, rgba(48, 16, 22, .96), rgba(24, 10, 14, .96));
+  animation: guideRise .3s ease;
+}
+
+.blocked-icon { font-size: 2.5rem; color: #f87171; margin-bottom: 12px; }
+.blocked-card h2 { margin: 0 0 6px; font-size: 1.3rem; }
+
+.blocked-reason {
+  margin: 16px 0;
+  padding: 13px 15px;
+  border-radius: 12px;
+  font-size: .9rem;
+  line-height: 1.55;
+  text-align: left;
+  background: rgba(248, 113, 113, .1);
+  border: 1px solid rgba(248, 113, 113, .22);
+}
+
+.blocked-reason .blocked-label {
+  display: block;
+  font-size: .68rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  opacity: .65;
+  margin-bottom: 5px;
+}
+
+.blocked-timer {
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: .4px;
+  margin: 6px 0 2px;
+  font-variant-numeric: tabular-nums;
+  color: #fca5a5;
+}
+
+.blocked-note { font-size: .8rem; opacity: .68; line-height: 1.55; margin: 12px 0 0; }
+
+/* ---------- phone tweaks ---------- */
+@media (max-width: 640px) {
+  .guide-modal { padding: 20px 17px; border-radius: 17px; max-height: 92vh; }
+  .guide-list li { font-size: .83rem; }
+  .blocked-card { padding: 26px 19px; }
+  .chat-private .chat-messages { max-height: 200px; }
+  .chat-app-actions .btn-sm span { display: none; }
+  .chat-app-actions .btn-sm { padding: 8px 10px; }
+}

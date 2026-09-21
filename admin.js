@@ -361,7 +361,7 @@
     if (!el) return;
     var list = DataStore.getHomework();
     el.innerHTML = list.length ? '<h4 class="admin-list-title">Published homework</h4>' + list.map(function (h, i) {
-      return '<div class="admin-item"><div><strong>' + App.escapeHtml(h.subject) + '</strong> — ' + App.escapeHtml(h.task.split('\n')[0]) +
+      return '<div class="admin-item"><div><strong>' + App.escapeHtml(h.subject) + '</strong> — ' + App.escapeHtml(String(h.task || '').split('\n')[0]) +
         '<div class="text-muted" style="font-size:.78rem">due ' + App.escapeHtml(h.due_date || '—') + '</div></div>' +
         '<button class="btn btn-danger btn-sm" data-del="hw" data-idx="' + i + '"><i class="fa-solid fa-trash"></i></button></div>';
     }).join('') : '<div class="text-muted" style="text-align:center;padding:16px">No homework yet.</div>';
@@ -1032,25 +1032,30 @@
 
   /* ---------- load all ---------- */
   function loadAll() {
-    fillStudentSelect();
-    renderHw();
-    renderScores();
-    renderAnn();
-    renderPolls();
-    renderSubjectsAdmin();
-    loadAiConfig();
-    loadDashboard();
-    renderActivity();
-    renderUserStats();
-    initCreds();
-    renderThemePicker();
+    /* Each section is isolated: one malformed synced record must not stop the
+       rest of the panel (or the new selects) from rendering. */
+    function safe(label, fn) {
+      try { fn(); } catch (e) { console.warn('admin section failed:', label, e); }
+    }
+    safe('students', fillStudentSelect);
+    safe('homework', renderHw);
+    safe('scores', renderScores);
+    safe('announcements', renderAnn);
+    safe('polls', renderPolls);
+    safe('subjects', renderSubjectsAdmin);
+    safe('ai', loadAiConfig);
+    safe('dashboard', loadDashboard);
+    safe('activity', renderActivity);
+    safe('users', renderUserStats);
+    safe('credentials', initCreds);
+    safe('theme', renderThemePicker);
     /* new admin sections */
-    fillPyqSelect();
-    renderPyqAdmin();
-    renderBlocked();
+    safe('pyqs', fillPyqSelect);
+    safe('pyqs-list', renderPyqAdmin);
+    safe('blocks', renderBlocked);
     var pvSel = document.getElementById('pvStudent');
     if (pvSel) {
-      var names = (DataStore.getStudents ? DataStore.getStudents() : []) || [];
+      var names = ((DataStore.getStudents ? DataStore.getStudents() : []) || []).filter(function (n) { return typeof n === 'string' && n; });
       pvSel.innerHTML = names.map(function (n) {
         return '<option value="' + App.escapeHtml(n) + '">' + App.escapeHtml(n) + '</option>';
       }).join('');
@@ -1059,7 +1064,7 @@
     }
     var blkSel = document.getElementById('blkStudent');
     if (blkSel) {
-      var names2 = (DataStore.getStudents ? DataStore.getStudents() : []) || [];
+      var names2 = ((DataStore.getStudents ? DataStore.getStudents() : []) || []).filter(function (n) { return typeof n === 'string' && n; });
       blkSel.innerHTML = names2.map(function (n) {
         return '<option value="' + App.escapeHtml(n) + '">' + App.escapeHtml(n) + '</option>';
       }).join('');
