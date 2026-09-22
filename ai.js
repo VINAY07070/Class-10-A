@@ -220,34 +220,11 @@
   /* ============ API engine ============ */
   function apiAnswer(raw, done) {
     if (!config || !config.apiKey) { done(localAnswer(raw)); return; }
-    var url = (config.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '') + '/chat/completions';
-    var system = config.systemPrompt || 'You are Class AI, a friendly study assistant for AIA Class 10-A students.';
-    var body = {
-      model: config.model || 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: raw }
-      ],
-      temperature: Number(config.temperature) || 0.7
-    };
-    fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + config.apiKey
-      },
-      body: JSON.stringify(body)
-    })
-      .then(function (r) {
-        if (!r.ok) throw new Error('API error ' + r.status);
-        return r.json();
-      })
-      .then(function (data) {
-        var text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || 'Hmm, the AI gave an empty reply.';
-        done(text);
-      })
+    AiaApi.chat(config, raw, config.systemPrompt)
+      .then(function (text) { done(text); })
       .catch(function (err) {
-        done('⚠️ **API brain error:** ' + err.message + '. The admin can check the API key in the Admin Panel → AI Bot. Meanwhile here\'s my local answer:\n\n' + localAnswer(raw));
+        done('\u26a0\ufe0f **API brain error:** ' + err.message +
+          '\n\nMeanwhile here is my local answer:\n\n' + localAnswer(raw));
       });
   }
 

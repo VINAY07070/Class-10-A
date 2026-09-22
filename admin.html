@@ -186,7 +186,18 @@
             <div class="form-group"><label>API key</label><input type="password" id="aiApiKey" placeholder="sk-...">
               <p class="text-muted" style="font-size:0.78rem;margin:6px 0 0"><i class="fa-solid fa-lock"></i> Stored only on this device. It is never synced, shared or published to the class relay.</p>
             </div>
-            <div class="form-group"><label>Base URL</label><input type="text" id="aiBaseUrl" placeholder="https://api.openai.com/v1"></div>
+            <div class="form-group"><label>Provider</label>
+              <select id="aiPreset">
+                <option value="openai">OpenAI</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="groq">Groq</option>
+                <option value="gemini">Google Gemini</option>
+                <option value="custom">Custom / other endpoint</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Base URL</label><input type="text" id="aiBaseUrl" placeholder="https://api.openai.com/v1">
+              <p class="text-muted" style="font-size:0.78rem;margin:6px 0 0">Paste it however you like — with or without <code>/chat/completions</code>, and with or without <code>https://</code>. It is tidied up when you save.</p>
+            </div>
             <div class="form-group"><label>Model</label><input type="text" id="aiModel" placeholder="gpt-4o-mini"></div>
             <div class="form-group"><label>Temperature</label><input type="number" id="aiTemp" placeholder="0.7" min="0" max="2" step="0.1"></div>
             <div class="form-group"><label>System prompt</label><textarea id="aiSystemPrompt" placeholder="You are Class AI..."></textarea></div>
@@ -354,6 +365,7 @@
 
   <script src="data/seed.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/aiapi.js"></script>
   <script src="js/stickmen.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>

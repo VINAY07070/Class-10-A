@@ -566,6 +566,8 @@
     var sysEl = document.getElementById('aiSystemPrompt');
     if (modeEl) modeEl.value = cfg.mode || 'local';
     if (keyEl) keyEl.value = cfg.apiKey || '';
+    var presetEl = document.getElementById('aiPreset');
+    if (presetEl) presetEl.value = cfg.preset || 'custom';
     if (baseEl) baseEl.value = cfg.baseUrl || 'https://api.openai.com/v1';
     if (modelEl) modelEl.value = cfg.model || 'gpt-4o-mini';
     if (tempEl) tempEl.value = cfg.temperature || 0.7;
@@ -575,16 +577,43 @@
   }
 
   function saveAiConfig() {
+    var presetEl = document.getElementById('aiPreset');
+    var preset = presetEl ? presetEl.value : 'custom';
+    /* Take whatever was typed, including a full endpoint path or a missing
+       scheme, and reduce it to a base we can actually call. */
+    var baseUrl = AiaApi.normalizeBaseUrl(document.getElementById('aiBaseUrl').value, preset);
+    var modelEl = document.getElementById('aiModel');
+    var model = modelEl.value.trim() || (AiaApi.PRESETS[preset] && AiaApi.PRESETS[preset].model) || '';
+    /* reflect the cleaned values back so the admin sees what was stored */
+    if (baseUrl) document.getElementById('aiBaseUrl').value = baseUrl;
+    if (model && modelEl) modelEl.value = model;
+
     var cfg = {
       mode: document.getElementById('aiMode').value,
       apiKey: document.getElementById('aiApiKey').value.trim(),
-      baseUrl: document.getElementById('aiBaseUrl').value.trim() || 'https://api.openai.com/v1',
-      model: document.getElementById('aiModel').value.trim() || 'gpt-4o-mini',
+      baseUrl: baseUrl,
+      model: model,
+      preset: preset,
       temperature: parseFloat(document.getElementById('aiTemp').value) || 0.7,
       systemPrompt: document.getElementById('aiSystemPrompt').value.trim()
     };
     DataStore.setAiConfig(cfg);
+    /* Remember which host this device agreed to, so a base URL that changes
+       later over sync cannot redirect the key elsewhere. */
+    if (cfg.apiKey && baseUrl) AiaApi.approveKeyHost(baseUrl);
     App.showToast('AI config saved 🤖', 'success');
+  }
+
+  /* Provider picker: fills in the base URL and a default model. */
+  function applyAiPreset() {
+    var sel = document.getElementById('aiPreset');
+    if (!sel) return;
+    var p = AiaApi.PRESETS[sel.value];
+    if (!p) return;
+    var b = document.getElementById('aiBaseUrl');
+    var m = document.getElementById('aiModel');
+    if (b && p.base) b.value = p.base;
+    if (m && p.model) m.value = p.model;
   }
 
   function testAi() {
@@ -592,25 +621,19 @@
     var msg = (document.getElementById('aiTestMsg') || {}).value || 'What is photosynthesis?';
     saveAiConfig();
     var cfg = DataStore.getAiConfig();
-    resultEl.innerHTML = '<div class="text-muted"><i class="fa-solid fa-circle-notch fa-spin"></i> Testing' + (cfg.mode === 'api' ? ' via API (' + cfg.model + ')...' : ' local engine...') + '</div>';
+    resultEl.innerHTML = '<div class="text-muted"><i class="fa-solid fa-circle-notch fa-spin"></i> Testing' + (cfg.mode === 'api' ? ' via API (' + App.escapeHtml(cfg.model || '') + ')...' : ' local engine...') + '</div>';
     setTimeout(function () {
       if (cfg.mode === 'api' && cfg.apiKey) {
-        var url = (cfg.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '') + '/chat/completions';
-        fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
-          body: JSON.stringify({ model: cfg.model, messages: [{ role: 'system', content: cfg.systemPrompt || 'You are Class AI.' }, { role: 'user', content: msg }], temperature: Number(cfg.temperature) || 0.7 })
-        })
-          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-          .then(function (d) {
-            var text = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || 'empty reply';
+        AiaApi.chat(cfg, msg, cfg.systemPrompt)
+          .then(function (text) {
             resultEl.innerHTML = '<div class="ai-test-ok"><i class="fa-solid fa-circle-check"></i> API works! Reply: ' + App.escapeHtml(text.slice(0, 220)) + '</div>';
           })
           .catch(function (err) {
-            resultEl.innerHTML = '<div class="ai-test-fail"><i class="fa-solid fa-circle-xmark"></i> API error: ' + App.escapeHtml(err.message) + '.<br><span class="text-muted">Note: browsers may block direct API calls (CORS). A local server or a CORS-enabled endpoint works best.</span></div>';
+            resultEl.innerHTML = '<div class="ai-test-fail"><i class="fa-solid fa-circle-xmark"></i> ' + App.escapeHtml(err.message) +
+              '<br><span class="text-muted">Checked against ' + App.escapeHtml(AiaApi.endpointFor(cfg.baseUrl, cfg.preset) || 'no URL') + '</span></div>';
           });
       } else {
-        var answer = 'Local engine works! 🎉 (No API key set — asking local class-knowledge engine.)';
+        var answer = 'Local engine works! \u{1F389} (No API key set \u2014 answering from the local class-knowledge engine.)';
         resultEl.innerHTML = '<div class="ai-test-ok"><i class="fa-solid fa-circle-check"></i> ' + answer + '</div>';
       }
     }, 250);
@@ -725,6 +748,8 @@
 
     var saveAi = document.getElementById('saveAiBtn');
     if (saveAi) saveAi.addEventListener('click', saveAiConfig);
+    var presetSel = document.getElementById('aiPreset');
+    if (presetSel) presetSel.addEventListener('change', applyAiPreset);
     var testBtn = document.getElementById('testAiBtn');
     if (testBtn) testBtn.addEventListener('click', testAi);
 
