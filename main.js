@@ -992,6 +992,10 @@ var App = (function () {
   function heroEntrance() {
     if (!window.gsap) return; // CSS entrance fallback keeps content visible
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    /* On phones the entrance animation competes with first paint and scrolling
+       for the whole first second, which is exactly when lag is felt. The CSS
+       fallback already leaves the content visible, so skip it there. */
+    if (window.AiaPerf && window.AiaPerf.lite) return;
     var tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
     tl.from('.hero-eyebrow', { y: 24, opacity: 0, duration: 0.7 }, 0.15)
       .from('.hero-title .line-top', { xPercent: -14, opacity: 0, duration: 0.85 }, 0.35)
@@ -1005,6 +1009,10 @@ var App = (function () {
     if (!window.gsap || !window.ScrollTrigger) return;
     try { if (gsap.registerPlugin) gsap.registerPlugin(ScrollTrigger); } catch (e) {}
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    /* A scrubbed parallax tween writes a transform on every scroll frame. On a
+       phone that is the most expensive thing on the page during the exact
+       gesture the user is judging, so leave it off there. */
+    if (window.AiaPerf && window.AiaPerf.lite) return;
     gsap.utils.toArray('[data-parallax]').forEach(function (el) {
       var amt = parseFloat(el.getAttribute('data-parallax')) || 0.18;
       gsap.to(el, {

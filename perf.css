@@ -40,18 +40,24 @@
   -webkit-backdrop-filter: none !important;
 }
 
-/* keep the frosted look with a solid equivalent so nothing goes transparent */
+/* keep the frosted look with a solid equivalent so nothing goes transparent.
+   The fill comes from the theme — hardcoding dark here made the light theme
+   put dark text on dark panels on phones. */
 .perf-lite .navbar,
 .perf-lite .navbar-inner,
 .perf-lite .mobile-drawer,
 .perf-lite .bottom-nav,
-.perf-lite .tabbar,
+.perf-lite .tabbar {
+  background-color: var(--nav-bg, rgba(12, 17, 34, .96)) !important;
+}
+/* The speech bubbles keep their own near-opaque fill: they are dark chrome
+   in every theme (they float over the page), so they must not be repainted
+   from the theme surface, which would leave white-on-white in the light
+   theme. */
 .perf-lite .toast,
 .perf-lite .modal,
 .perf-lite .modal-content,
 .perf-lite .dialog,
-.perf-lite .sm-tag,
-.perf-lite .sm-bubble,
 .perf-lite .chat-input-area,
 .perf-lite .login-card,
 .perf-lite .glass-card,
@@ -62,11 +68,15 @@
 .perf-lite .chat-container,
 .perf-lite .chat-header,
 .perf-lite .chat-app {
-  background-color: rgba(12, 17, 34, .96) !important;
+  background-color: var(--glass-opaque, rgba(12, 17, 34, .96)) !important;
+}
+.perf-lite .sm-bubble,
+.perf-lite .sm-tag {
+  background-color: rgba(16, 22, 44, .96) !important;
 }
 
 .perf-lite .login-gate {
-  background-color: rgba(5, 8, 18, .985) !important;
+  background-color: var(--bg, rgba(5, 8, 18, .985)) !important;
 }
 
 /* ---------- 4. perf-lite: tame always-on motion ---------- */

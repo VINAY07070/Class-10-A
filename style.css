@@ -2333,7 +2333,7 @@ h1, h2, h3, h4 { line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; }
   font-weight: 900;
   letter-spacing: .18em;
   color: var(--text-muted);
-  background: rgba(10,14,28,.7);
+  background: var(--glass-opaque, rgba(10,14,28,.7));
   border: 1px solid var(--border);
   border-radius: 100px;
   padding: 3px 12px;
@@ -3378,10 +3378,24 @@ html.perf-lite .panel,
 html.perf-lite .sync-content {
   background: var(--glass-opaque, #0d1428) !important;
 }
+/* These solid fills replace the translucent frosted look lost when we drop
+   backdrop-filter. They must follow the theme: a hardcoded dark fill left the
+   light theme with dark panels and dark text on top of them. */
+html.perf-lite .navbar,
+html.perf-lite .navbar-inner,
 html.perf-lite .mobile-drawer,
+html.perf-lite .bottom-nav,
+html.perf-lite .tabbar {
+  background: var(--nav-bg, rgba(16,22,44,.98)) !important;
+}
 html.perf-lite .modal-content,
 html.perf-lite .toast {
-  background: rgba(16,22,44,.98) !important;
+  background: var(--glass-opaque, rgba(16,22,44,.98)) !important;
+}
+/* bubbles stay dark chrome regardless of theme — see perf.css */
+html.perf-lite .sm-bubble,
+html.perf-lite .sm-tag {
+  background: rgba(16, 22, 44, .98) !important;
 }
 
 /* decorative blur orbs cost a full-screen composite each frame */
@@ -3417,8 +3431,6 @@ html.perf-lite .feature-card::before { animation: none !important; }
 html.perf-lite .stickman:hover .sm-svg,
 html.perf-lite .stickman.grabbed .sm-svg,
 html.perf-lite .sm-svg { filter: none !important; }
-html.perf-lite .sm-bubble { background: rgba(16,22,44,.98) !important; }
-html.perf-lite .sm-tag { background: rgba(13,18,36,.92) !important; }
 
 /* cheaper chrome on the big painted surfaces */
 html.perf-lite .navbar { box-shadow: 0 1px 0 var(--border); }

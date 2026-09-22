@@ -208,10 +208,16 @@
       }
     }
 
-    function frame() {
+    var lastPaintAt = 0, FRAME_CAP = LITE ? 30 : 60;
+    function frame(now) {
+      raf = requestAnimationFrame(frame);
+      /* The drift is slow, so halving the cadence on phones is invisible but
+         frees half the main thread for scrolling. */
+      var minGap = 1000 / FRAME_CAP - 1.5;
+      if (now && now - lastPaintAt < minGap) return;
+      lastPaintAt = now || 0;
       step();
       paint();
-      raf = requestAnimationFrame(frame);
     }
 
     var REDUCED = false;

@@ -23,6 +23,11 @@
   --text: #eef2ff;
   --text-secondary: #aab4d4;
   --text-muted: #7d89ad;
+  /* Faint caption/dim text. Components such as extras.css reference this
+     token with a dark-theme fallback, so leaving it undefined made that text
+     unreadable on the light theme. It is derived from --text-muted wherever
+     possible; themes without a definition inherit this one. */
+  --text-dim: #8f9cbe;
   --gold: #f5b544;
   --gold-2: #ffd889;
   --violet: #7c6cff;
@@ -100,15 +105,20 @@
   --border-strong: rgba(20, 30, 60, 0.2);
   --text: #16203a;
   --text-secondary: #41507a;
-  --text-muted: #6a78a3;
-  --gold: #d99a2b;
-  --gold-2: #e5b04a;
-  --violet: #6c5ce7;
-  --blue: #3b82f6;
-  --cyan: #0891b2;
-  --green: #0d9668;
-  --red: #e5484d;
-  --pink: #d63384;
+  --text-muted: #5b6889;
+  --text-dim: #4a5675;
+  /* Accents double as text on this light background, so they are darker here
+     than in the dark themes: the bright neon originals only clear 3:1 as
+     fills, not as text. Gradients keep the brighter pair — they only ever
+     sit behind white text. */
+  --gold: #8a5a00;
+  --gold-2: #a06a10;
+  --violet: #5b4bd6;
+  --blue: #2563eb;
+  --cyan: #0e6b82;
+  --green: #0a6b4a;
+  --red: #c0263a;
+  --pink: #a81e63;
   --grad-primary: linear-gradient(135deg, #6c5ce7 0%, #3b82f6 50%, #0891b2 100%);
   --grad-gold: linear-gradient(135deg, #d99a2b 0%, #e07b39 60%, #f0c04a 100%);
   --grad-fire: linear-gradient(135deg, #e5484d, #e07b39, #f0c04a);
@@ -130,6 +140,24 @@
 [data-theme="simple"] .tabbar { background: rgba(255, 255, 255, 0.94); border-top-color: var(--border); }
 [data-theme="simple"] .login-overlay { background: var(--bg); }
 [data-theme="simple"] .stickman .sm-tag { color: #fff; }
+
+/* Components below paint a fixed dark fill (or no fill of their own) and
+   rely on a dark-theme text colour. On this light theme that leaves dark
+   text on a dark chip or white text on white, so each is re-pointed at the
+   theme tokens here rather than hard-coded, keeping other themes untouched. */
+[data-theme="simple"] .sm-bubble { background: #1b2544; border-color: rgba(20, 30, 60, .28); }
+[data-theme="simple"] .sm-bubble-text { color: #eef2ff; }
+[data-theme="simple"] .chat-msg-author { color: #8a5a00; }
+[data-theme="simple"] .chat-msg.user .chat-msg-author { color: var(--blue); }
+[data-theme="simple"] .chat-msg-time { color: var(--text-muted); }
+[data-theme="simple"] .chat-app-header,
+[data-theme="simple"] .chat-messages { background: var(--surface); }
+/* Dotted toward the dark ink rather than recoloured flat, so each subject
+   keeps its own colour while still clearing 4.5:1 on the light card. */
+[data-theme="simple"] .subject-open-btn { color: color-mix(in srgb, var(--subj) 68%, #0f1a33); }
+[data-theme="simple"] .pyq-tab.active { color: #6b4400; border-color: #8a5a00;
+  background: color-mix(in srgb, #8a5a00 12%, transparent); }
+[data-theme="simple"] .pyq-chip.active { color: #fff; background: #8a5a00; border-color: #8a5a00; }
 
 /* ---------- MIDNIGHT (deep navy, near-black) ---------- */
 [data-theme="midnight"] {

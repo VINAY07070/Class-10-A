@@ -10,7 +10,22 @@ below. Do NOT refactor, optimise, restyle, or "improve" anything outside it —
 not the stickman art, not page-load speed, not the script-loader chain, not CSS,
 not unrelated pages. If you spot an unrelated bug, report it; do not fix it.
 
-The four original items (1–4) are DONE and verified. The current scope is:
+The four original items (1–4) are DONE and verified, and 5–9 are done. The
+current scope is ONLY:
+
+10. **Theme text contrast.** Some themes make text unreadable — colours mix or
+    vary so text disappears against its background. Fix contrast in every
+    theme.
+11. **Remove the line "33 names, one constellation." from the home page.**
+12. **Notification section** that appears to the right user when a new class
+    chat message arrives, and when the admin sends a private chat message.
+13. **Satisfying sound effects** for the site.
+14. **A section where users can update their own profile.** The user reports
+    this is missing and wants it added.
+
+Do not start any other work. Do not touch unrelated pages or refactor.
+
+### Items 5–9 (done, do not regress)
 
 5. **PYQ papers in the seed.** Add RBSE Class 10 half-yearly + yearly papers
    for the last three years (2023, 2024, 2025), for every subject in
