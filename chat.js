@@ -89,6 +89,7 @@
   var pvInput = document.getElementById('chatPvInput');
   var pvSendBtn = document.getElementById('chatPvSend');
   var pvClose = document.getElementById('chatPvClose');
+  var pvClear = document.getElementById('chatPvClear');
   var pvStop = null;
 
   function myUsername() { return session ? session.username : ''; }
@@ -116,10 +117,18 @@
     if (window.AiaPrivate && !pvStop) {
       var known = {};
       (DataStore.getPrivateChat(myUsername()) || []).forEach(function (m) { if (m && m.id) known[m.id] = 1; });
+      /* Ids the student has cleared are pre-seeded as "seen" — both so the
+         relay's replay of the old thread is ignored and so a message that
+         arrives later with the same id is not resurrected. */
+      (DataStore.getPrivateCleared ? DataStore.getPrivateCleared(myUsername()) : []).forEach(function (id) {
+        if (id) known[id] = 1;
+      });
       pvStop = window.AiaPrivate.listen(myUsername(), function (batch) {
         var changed = false;
         batch.forEach(function (m) {
           if (m.role !== 'admin') return;      /* our own outbound messages are already stored */
+          if (known[m.id]) return;
+          known[m.id] = 1;
           DataStore.addPrivateMessage(myUsername(), { id: m.id, text: m.text, role: 'admin', name: m.name, at: m.at });
           changed = true;
         });
@@ -151,6 +160,15 @@
   if (pvToggle) pvToggle.addEventListener('click', function () {
     if (pvPanel && pvPanel.style.display === 'block') closePv(); else openPv();
   });
+  if (pvClear) {
+    pvClear.addEventListener('click', function () {
+      if (!session) return;
+      if (!confirm('Clear this private thread from your device?')) return;
+      var n = DataStore.clearPrivateChat(myUsername());
+      App.showToast(n ? 'Private chat cleared on this device' : 'Nothing to clear', 'info');
+      renderPv();
+    });
+  }
   if (pvClose) pvClose.addEventListener('click', closePv);
   if (pvSendBtn) pvSendBtn.addEventListener('click', sendPv);
   if (pvInput) pvInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendPv(); });

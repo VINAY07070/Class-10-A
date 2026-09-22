@@ -217,7 +217,149 @@
     return false;
   }
 
+  /* ============ live site context (API engine) ============ */
+  /* The API brain is told everything the site knows. Rebuilt from DataStore
+     on every question so the answer reflects the latest synced state —
+     announcements posted a second ago, a teacher just renamed in the admin
+     panel, homework added from another phone. */
+  function buildSiteContext() {
+    var L = [];
+    var meta = (window.SEED && window.SEED.meta) || {};
+    L.push('SITE: ' + (meta.site_name || 'AIA Class 10-A Hub'));
+    L.push('SCHOOL: ' + (meta.school || '') + ' | CLASS: ' + (meta.class || '') + ' | ADMIN: ' + (meta.admin_name || ''));
+    L.push('You are answering as the class assistant inside this site. Use ONLY the facts below. If something is not listed, say you do not have it — never invent names, marks or dates.');
+    L.push('Answers must match the site data exactly. Give short, friendly, exam-focused replies.');
+
+    try {
+      var teachers = DataStore.getTeachers() || [];
+      L.push('\nTEACHERS (' + teachers.length + '):');
+      teachers.forEach(function (t) {
+        L.push('- ' + (t.subject || '?') + ': ' + (t.name || '?') + (t.detail ? ' — ' + t.detail : ''));
+      });
+    } catch (e) {}
+
+    try {
+      var lead = DataStore.getLeadership() || [];
+      if (lead.length) {
+        L.push('\nLEADERSHIP:');
+        lead.forEach(function (p) { L.push('- ' + (p.role || '') + ': ' + (p.name || '')); });
+      }
+    } catch (e) {}
+
+    try {
+      var subs = DataStore.getSubjects() || [];
+      if (subs.length) {
+        L.push('\nSUBJECTS & NOTES:');
+        subs.forEach(function (s) {
+          var c = DataStore.getSubjectContentFor(s.name);
+          L.push('- ' + s.name + ' (teacher ' + s.teacher + '): ' + ((c && c.notes) || s.info || 'no notes'));
+        });
+      }
+    } catch (e) {}
+
+    try {
+      var students = DataStore.getStudents() || [];
+      var profiles = DataStore.getStudentProfiles() || [];
+      var byName = {};
+      profiles.forEach(function (p) { if (p && p.student_name) byName[String(p.student_name).toUpperCase()] = p; });
+      L.push('\nSTUDENTS (' + students.length + '): ' + students.join(', '));
+      var withProfile = Object.keys(byName);
+      if (withProfile.length) {
+        L.push('STUDENT PROFILES:');
+        withProfile.forEach(function (n) {
+          var p = byName[n];
+          var bits = [];
+          if (p.bio) bits.push('bio: ' + p.bio);
+          if (p.strengths) bits.push('strengths: ' + p.strengths);
+          if (p.interests) bits.push('interests: ' + p.interests);
+          if (p.goals) bits.push('goals: ' + p.goals);
+          if (bits.length) L.push('- ' + p.student_name + ': ' + bits.join(' | '));
+        });
+      }
+    } catch (e) {}
+
+    try {
+      var hw = DataStore.getHomework() || [];
+      L.push('\nHOMEWORK (' + hw.length + '):');
+      if (!hw.length) L.push('- none right now');
+      hw.slice(0, 40).forEach(function (h) {
+        L.push('- ' + (h.subject || '') + ': ' + String(h.task || '').replace(/\s+/g, ' ').slice(0, 200) +
+          (h.due_date ? ' (due ' + h.due_date + ')' : ''));
+      });
+    } catch (e) {}
+
+    try {
+      var ann = DataStore.getAnnouncements() || [];
+      L.push('\nANNOUNCEMENTS (' + ann.length + '):');
+      if (!ann.length) L.push('- none right now');
+      ann.slice(-20).forEach(function (a) {
+        L.push('- ' + (a.title || '') + ': ' + String(a.body || '').replace(/\s+/g, ' ').slice(0, 300));
+      });
+    } catch (e) {}
+
+    try {
+      var polls = DataStore.getPolls() || [];
+      if (polls.length) {
+        L.push('\nPOLLS:');
+        polls.forEach(function (p) {
+          var counts = DataStore.pollCounts ? DataStore.pollCounts(p.id) : null;
+          L.push('- ' + (p.question || '') + ' | options: ' + (p.options || []).join(', ') +
+            (counts ? ' | votes: ' + JSON.stringify(counts) : ''));
+        });
+      }
+    } catch (e) {}
+
+    try {
+      var scores = DataStore.getTestScores() || [];
+      if (scores.length) {
+        L.push('\nTEST SCORES:');
+        scores.slice(-60).forEach(function (s) {
+          var pct = s.max_score ? Math.round(s.score / s.max_score * 100) : '';
+          L.push('- ' + (s.student_name || '') + ' | ' + (s.subject || '') + ' | ' + (s.test_name || '') +
+            ' | ' + s.score + '/' + s.max_score + (pct !== '' ? ' (' + pct + '%)' : ''));
+        });
+      }
+    } catch (e) {}
+
+    try {
+      var pyqs = DataStore.getPyqs() || [];
+      if (pyqs.length) {
+        var byKind = {};
+        pyqs.forEach(function (p) {
+          var k = p.kind || 'other';
+          byKind[k] = byKind[k] || [];
+          byKind[k].push(p.subject + (p.year ? ' ' + p.year : ''));
+        });
+        L.push('\nPYQ PAPERS (' + pyqs.length + ' total) — students practise these on the PYQs page:');
+        Object.keys(byKind).forEach(function (k) {
+          L.push('- ' + k + ': ' + byKind[k].join(', '));
+        });
+      }
+    } catch (e) {}
+
+    try {
+      var chat = DataStore.getClassChat() || [];
+      if (chat.length) {
+        L.push('\nRECENT CLASS CHAT (latest ' + Math.min(chat.length, 12) + '):');
+        chat.slice(-12).forEach(function (m) {
+          L.push('- ' + (m.name || m.username || '?') + ': ' + String(m.content || '').replace(/\s+/g, ' ').slice(0, 160));
+        });
+      }
+    } catch (e) {}
+
+    try {
+      L.push('\nTODAY: ' + new Date().toDateString());
+      L.push('CURRENT USER: ' + USER.name + ' (' + USER.role + ')');
+    } catch (e) {}
+
+    return L.join('\n');
+  }
+
   /* ============ API engine ============ */
+  /* Exposed so other pages (and tests) can inspect exactly what the AI is
+     told about the site. */
+  window.AiaContext = { build: buildSiteContext };
+
   function apiAnswer(raw, done) {
     /* A student with no key of their own can still reach the class AI when
        the admin has chosen to share it. */
@@ -227,7 +369,10 @@
       if (shared) cfg = shared;
     }
     if (!cfg || !cfg.apiKey) { done(localAnswer(raw)); return; }
-    AiaApi.chat(cfg, raw, cfg.systemPrompt)
+    /* Rebuild the site context now, not at page load, so the reply reflects
+       whatever synced in since — including a just-posted announcement. */
+    var prompt = (cfg.systemPrompt || '') + '\n\n' + buildSiteContext();
+    AiaApi.chat(cfg, raw, prompt)
       .then(function (text) { done(text); })
       .catch(function (err) {
         done('\u26a0\ufe0f **API brain error:** ' + err.message +

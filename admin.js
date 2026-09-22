@@ -851,6 +851,82 @@
     });
   }
 
+  /* ---------- TEACHERS ----------
+     Subject is the natural key: a class has one teacher per subject, and
+     seed.teachers is shaped that way. Saving an existing subject updates that
+     record instead of appending a duplicate. */
+  function fillTeacherSelect() {
+    var sel = document.getElementById('tcSubject');
+    if (!sel) return;
+    var subjects = (DataStore.getSubjects() || []).map(function (s) { return s && s.name; }).filter(Boolean);
+    var known = (DataStore.getTeachers() || []).map(function (t) { return t && t.subject; }).filter(Boolean);
+    known.forEach(function (s) { if (subjects.indexOf(s) === -1) subjects.push(s); });
+    sel.innerHTML = subjects.map(function (s) {
+      return '<option value="' + App.escapeHtml(s) + '">' + App.escapeHtml(s) + '</option>';
+    }).join('');
+    sel.addEventListener('change', function () { loadTeacherIntoForm(sel.value); });
+    if (subjects.length) loadTeacherIntoForm(subjects[0]);
+  }
+
+  function teacherBySubject(subject) {
+    var want = String(subject || '').trim().toLowerCase();
+    return (DataStore.getTeachers() || []).find(function (t) {
+      return t && String(t.subject || '').trim().toLowerCase() === want;
+    }) || null;
+  }
+
+  function loadTeacherIntoForm(subject) {
+    var t = teacherBySubject(subject);
+    var nameEl = document.getElementById('tcName');
+    var detailEl = document.getElementById('tcDetail');
+    if (nameEl) nameEl.value = t ? (t.name || '') : '';
+    if (detailEl) detailEl.value = t ? (t.detail || '') : '';
+  }
+
+  function saveTeacher() {
+    var subject = (document.getElementById('tcSubject') || {}).value || '';
+    var name = (document.getElementById('tcName') || {}).value || '';
+    var detail = (document.getElementById('tcDetail') || {}).value || '';
+    if (!subject) { App.showToast('Pick a subject first', 'error'); return; }
+    if (!name.trim()) { App.showToast('Teacher name cannot be empty', 'error'); return; }
+    var list = (DataStore.getTeachers() || []).slice();
+    var want = String(subject).trim().toLowerCase();
+    var idx = list.findIndex(function (t) {
+      return t && String(t.subject || '').trim().toLowerCase() === want;
+    });
+    var rec = { subject: subject.trim(), name: name.trim(), detail: detail.trim() };
+    if (idx >= 0) list[idx] = Object.assign({}, list[idx], rec);
+    else list.push(rec);
+    DataStore.setTeachers(list);
+    renderTeacherAdmin();
+    App.showToast('Teacher saved ✓', 'success');
+  }
+
+  function renderTeacherAdmin() {
+    var el = document.getElementById('teacherAdminList');
+    if (!el) return;
+    var list = DataStore.getTeachers() || [];
+    if (!list.length) { el.innerHTML = '<p class="text-muted">No teachers yet.</p>'; return; }
+    var rows = list.map(function (t) {
+      return '<tr><td><strong>' + App.escapeHtml(t.subject || '') + '</strong></td>' +
+        '<td>' + App.escapeHtml(t.name || '') + '</td>' +
+        '<td>' + App.escapeHtml(t.detail || '') + '</td>' +
+        '<td><button class="btn btn-secondary btn-sm" data-edit-teacher="' +
+          App.escapeHtml(t.subject || '') + '">Edit</button></td></tr>';
+    }).join('');
+    el.innerHTML = '<table class="admin-table"><thead><tr><th>Subject</th><th>Teacher</th><th>Details</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+    el.querySelectorAll('[data-edit-teacher]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var subject = b.getAttribute('data-edit-teacher');
+        var sel = document.getElementById('tcSubject');
+        if (sel) sel.value = subject;
+        loadTeacherIntoForm(subject);
+        var nameEl = document.getElementById('tcName');
+        if (nameEl) nameEl.focus();
+      });
+    });
+  }
+
   /* ---------- PYQ papers ---------- */
   function fillPyqSelect() {
     var sel = document.getElementById('pyqSubject');
@@ -979,16 +1055,31 @@
     if (window.AiaPrivate) {
       var known = {};
       DataStore.getPrivateChat(pvCurrent).forEach(function (m) { if (m && m.id) known[m.id] = 1; });
+      /* Ids the admin cleared stay "seen", so the relay's 12h replay cannot
+         bring the deleted thread back. */
+      (DataStore.getPrivateCleared ? DataStore.getPrivateCleared(pvCurrent) : []).forEach(function (id) {
+        if (id) known[id] = 1;
+      });
       pvStop = window.AiaPrivate.listen(pvCurrent, function (batch) {
         var changed = false;
         batch.forEach(function (m) {
           if (m.role === 'admin') return;    /* our own outbound messages are already stored */
+          if (known[m.id]) return;
+          known[m.id] = 1;
           DataStore.addPrivateMessage(pvCurrent, { id: m.id, text: m.text, role: 'student', name: m.name, at: m.at });
           changed = true;
         });
         if (changed) renderPvThread();
       }, { known: known, since: '48h' });
     }
+  }
+
+  function clearPvThread() {
+    if (!pvCurrent) { App.showToast('Pick a student first', 'error'); return; }
+    if (!confirm('Clear this private thread from your device?')) return;
+    var n = DataStore.clearPrivateChat(pvCurrent);
+    App.showToast(n ? 'Thread cleared on this device' : 'Nothing to clear', 'info');
+    renderPvThread();
   }
 
   function pvSend() {
@@ -1082,6 +1173,8 @@
     safe('announcements', renderAnn);
     safe('polls', renderPolls);
     safe('subjects', renderSubjectsAdmin);
+    safe('teachers', fillTeacherSelect);
+    safe('teachers-list', renderTeacherAdmin);
     safe('ai', loadAiConfig);
     safe('dashboard', loadDashboard);
     safe('activity', renderActivity);
@@ -1111,10 +1204,14 @@
   }
 
   bindAdds();
+  var saveTeacherBtn = document.getElementById('saveTeacherBtn');
+  if (saveTeacherBtn) saveTeacherBtn.addEventListener('click', saveTeacher);
   var addPyqBtn = document.getElementById('addPyqBtn');
   if (addPyqBtn) addPyqBtn.addEventListener('click', addPyq);
   var pvSendBtn = document.getElementById('pvSendBtn');
   if (pvSendBtn) pvSendBtn.addEventListener('click', pvSend);
+  var pvClearBtn = document.getElementById('pvClearBtn');
+  if (pvClearBtn) pvClearBtn.addEventListener('click', clearPvThread);
   var pvInputEl = document.getElementById('pvInput');
   if (pvInputEl) pvInputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') pvSend(); });
   var blockBtn = document.getElementById('blockBtn');

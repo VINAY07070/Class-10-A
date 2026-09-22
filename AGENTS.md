@@ -3,26 +3,90 @@
 Static multi-page class portal. HTML + CSS + vanilla JS. **No build step.**
 Must work when opened directly via `file://` as well as served over HTTP.
 
-## ACTIVE SCOPE — work ONLY on these four items. Nothing else, ever.
+## ACTIVE SCOPE — work ONLY on these items. Nothing else, ever.
 
 The user has asked repeatedly and emphatically that work is limited to the list
 below. Do NOT refactor, optimise, restyle, or "improve" anything outside it —
 not the stickman art, not page-load speed, not the script-loader chain, not CSS,
 not unrelated pages. If you spot an unrelated bug, report it; do not fix it.
 
-1. **AI usable by all users via the admin's shared AI setup.**
-   Implemented (admin share toggle + wrapped key in `data.js`, consumed by
-   `ai.js`). NOT yet tested.
-2. **Each user's AI chat history stays private.**
-   Exclusion of `aia_ai_chat_*` from sync started; not finished or tested.
-3. **Private chat: admin → student delivery, and the missing student-side
-   section.** Admin sends, student sees nothing and no section appears.
-   Only investigated; NOT fixed.
-4. **Profile-edit section for users** (profile only, nothing else).
-   Not started.
+The four original items (1–4) are DONE and verified. The current scope is:
 
-Acceptance for each is behavioural: prove it in a browser across two devices
-(or two contexts) before calling it done.
+5. **PYQ papers in the seed.** Add RBSE Class 10 half-yearly + yearly papers
+   for the last three years (2023, 2024, 2025), for every subject in
+   `seed.subjects`, plus practice papers per subject. Seed-only, no invented
+   external file URLs (a paper with no `url` renders "No file attached").
+6. **Private chat still broken.** Admin → student delivery must work on real
+   devices, not just in a test harness. Re-verify end to end.
+7. **AI must know the whole site.** The AI assistant must be given the site's
+   live state as context — who is who (teachers, leadership, students),
+   announcements, homework, polls, scores, subjects, PYQs — and must receive
+   the *latest* state each time it answers, not a stale snapshot.
+8. **Teacher information editing in the admin panel.** Done — Teachers tab,
+   edits `aia_teachers` (already an LWW synced key).
+9. **Clear option for the user's private thread.** Done — `chatPvClear` in
+   `chat.html` + `clearPvThread` in admin, backed by
+   `DataStore.clearPrivateChat()`.
+
+Acceptance for each is behavioural: prove it in a browser before calling it
+done. Do not start any other work.
+
+### Details worth remembering (items 5–9)
+
+- **PYQ papers** ship in `seed.js` under `pyqs` (48 = 18 half-yearly +
+  18 yearly for 2023/2024/2025 across the six subjects, + 12 practice).
+  `DataStore.getPyqs()` *merges* seed + `aia_pyqs` by id so a seeded paper is
+  never hidden by the admin's uploads, and an admin can attach a file to a
+  seeded paper by saving a record with the same id. Seed papers carry
+  `url: ""`, which renders the honest "No file attached" state — do not
+  invent external file URLs.
+- **Teacher editing** keys on `subject` (one teacher per subject). Saving
+  updates an existing record instead of appending a duplicate. The subject's
+  displayed teacher is *derived* from `aia_teachers` inside
+  `DataStore.getSubjects()`, so an edit reaches every page and the AI without
+  touching `seed.subjects`; the returned objects are copies, so callers must
+  not mutate them.
+- **AI site context** is built by `buildSiteContext()` in `ai.js`, rebuilt on
+  every question and exposed as `window.AiaContext.build()` for testing. It
+  covers teachers, leadership, subjects/notes, students/profiles, homework,
+  announcements, polls, scores, PYQs, recent class chat, date and current user.
+  Feed it the *actual* stored state: `getTestScores()` is often `[]` (the
+  writer was empty on previous visits), so asserting on seed values instead of
+  live values produces false failures.
+- **Clearing a private thread** must tombstone, not just delete: the relay
+  keeps replaying the room for ~12h, so a plain wipe reappears on the next
+  poll. Cleared ids go to `aia_private_chat_cleared_<user>`, are pre-seeded
+  into the listener's `known` map, and `addPrivateMessage()` refuses to
+  re-add a tombstoned id. Clear is per-device; it is not a delete for the
+  other party.
+
+### Original items 1–4 (complete, do not regress)
+
+1. **AI usable by all users via the admin's shared AI setup.** Done —
+   `aia_ai_shared` registered in `SYNC_DEFS`, wrapped key in `data.js`,
+   consumed by `ai.js`. Must publish to every relay (see sync notes).
+2. **Each user's AI chat history stays private.** Done — `aia_ai_chat_*`
+   excluded from sync in `relay.js` `shortKey()`.
+3. **Private chat: admin → student delivery** + student-side section. Done.
+4. **Profile-edit section for users.** Done.
+
+### The ntfy mirrors are NOT federated (critical)
+
+`ntfy.sh`, `ntfy.envs.net` and `ntfy.mzte.de` are **independent servers**. A
+message posted to one is invisible on the others, and each device picks
+whichever relay answered for it. Publishing to a single relay made cross-device
+sync take ~30 s (until the next all-relay safety poll) and looked like "sync
+is broken".
+
+Rule: **every publish must fan out to all relays** (`relay.js` `post()`,
+`private-chat.js` `post()`), and **every reader must merge all relays**
+(`catchUp()`, private-chat `pollAll()`). Ids deduplicate the overlap.
+
+A relay that times out is cooled down for `DOWN_MS` (`downUntil` /
+`liveServers()`), otherwise every poll pays its full 8 s `FETCH_TIMEOUT` even
+when a healthy mirror answered in milliseconds. That cost was private chat
+taking ~12–21 s.
+
 
 ## Layout (easy to get wrong)
 

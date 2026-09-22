@@ -76,6 +76,7 @@
           <button class="admin-tab" data-tab="polls"><i class="fa-solid fa-square-poll-vertical"></i> Polls</button>
           <button class="admin-tab" data-tab="profiles"><i class="fa-solid fa-graduation-cap"></i> Profiles</button>
           <button class="admin-tab" data-tab="subjects"><i class="fa-solid fa-book"></i> Subjects</button>
+          <button class="admin-tab" data-tab="teachers"><i class="fa-solid fa-chalkboard-user"></i> Teachers</button>
           <button class="admin-tab" data-tab="aibot"><i class="fa-solid fa-robot"></i> AI Bot</button>
           <button class="admin-tab" data-tab="pyqs"><i class="fa-solid fa-file-pen"></i> PYQ Papers</button>
           <button class="admin-tab" data-tab="private"><i class="fa-solid fa-user-shield"></i> Private Chat</button>
@@ -170,6 +171,19 @@
             </div>
             <button class="btn btn-primary" id="saveSubjBtn"><i class="fa-solid fa-floppy-disk"></i> Save Subject</button>
           </div>
+        </div>
+
+        <!-- TEACHERS -->
+        <div class="admin-panel" id="panel-teachers">
+          <div class="admin-form">
+            <h3 class="heading-sm">Teacher Information</h3>
+            <p class="text-muted" style="font-size:.85rem;margin:8px 0 16px">Edit who teaches which subject. The AI assistant reads these records when students ask about teachers, so keep them accurate. Changes sync to every device.</p>
+            <div class="form-group"><label>Subject</label><select id="tcSubject"></select></div>
+            <div class="form-group"><label>Teacher name</label><input type="text" id="tcName" placeholder="e.g. Babulal Ji"></div>
+            <div class="form-group"><label>Details (AI can read this)</label><textarea id="tcDetail" placeholder="e.g. Most respected and elderly • wears glasses"></textarea></div>
+            <button class="btn btn-primary" id="saveTeacherBtn"><i class="fa-solid fa-floppy-disk"></i> Save Teacher</button>
+          </div>
+          <div id="teacherAdminList"></div>
         </div>
 
         <!-- AI BOT -->
@@ -270,6 +284,7 @@
             <div class="pv-compose">
               <input type="text" id="pvInput" placeholder="Write a private message..." maxlength="500" autocomplete="off">
               <button class="btn btn-primary btn-sm" id="pvSendBtn"><i class="fa-solid fa-paper-plane"></i> Send</button>
+              <button class="btn btn-secondary btn-sm" id="pvClearBtn" title="Clear this thread on this device"><i class="fa-solid fa-broom"></i> Clear</button>
             </div>
           </div>
         </div>

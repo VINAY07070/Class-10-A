@@ -31,6 +31,20 @@
   border-radius: 6px;
 }
 
+.chat-private-bar .pv-clear {
+  margin-left: auto;
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: 999px;
+  opacity: .85;
+}
+
+.chat-private-bar .pv-clear:hover { opacity: 1; background: rgba(255, 255, 255, .1); }
+
 .chat-private-bar .pv-close:hover { background: rgba(255, 255, 255, .1); }
 
 .chat-private .chat-messages { max-height: 260px; min-height: 120px; }

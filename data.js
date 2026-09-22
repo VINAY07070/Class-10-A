@@ -396,7 +396,26 @@ var DataStore = (function () {
      nothing here is invented: the section renders exactly what has been
      uploaded and shows an honest empty state until then. `kind` is one of
      'half-yearly' | 'yearly' | 'practice'. */
-  function getPyqs() { return _get(KEYS.pyqs, []); }
+  function getPyqs() {
+    /* The seed ships the RBSE paper set, and the admin adds their own on top.
+       Returning only the stored list would make every seeded paper vanish the
+       moment the admin uploaded one, so merge the two by id (a stored paper
+       wins, which is what lets an admin attach a file to a seeded paper). */
+    var seed = (window.SEED && window.SEED.pyqs) || [];
+    var stored = _get(KEYS.pyqs, null);
+    if (!stored || !stored.length) return seed;
+    var byId = {}, order = [];
+    function put(p, overwrite) {
+      if (!p || !p.title) return;
+      var id = p.id || p.title;
+      if (byId[id] && !overwrite) return;
+      if (!byId[id]) order.push(id);
+      byId[id] = p;
+    }
+    seed.forEach(function (p) { put(p, false); });
+    stored.forEach(function (p) { put(p, true); });
+    return order.map(function (id) { return byId[id]; });
+  }
   function addPyq(p) {
     if (!p || !p.title) return null;
     if (!p.id) p.id = _uid('pyq');
@@ -425,6 +444,9 @@ var DataStore = (function () {
   }
   function addPrivateMessage(username, msg) {
     if (!username || !msg) return [];
+    if (msg.id && getPrivateCleared(username).indexOf(msg.id) !== -1) {
+      return getPrivateChat(username);
+    }
     var l = getPrivateChat(username);
     if (!msg.id) msg.id = _uid('pm');
     if (!msg.at) msg.at = new Date().toISOString();
@@ -433,6 +455,28 @@ var DataStore = (function () {
     if (l.length > 300) l = l.slice(-300);
     _set(privateKey(username), l);
     return l;
+  }
+
+  /* Clearing a private thread has to be remembered, not just deleted. The
+     relay still holds the messages and keeps replaying them for ~12h, so a
+     plain wipe would restore the whole thread on the next poll. Cleared ids
+     are tombstoned and skipped on ingest, which is what makes the clear
+     stick. */
+  function privateClearedKey(username) { return 'aia_private_chat_cleared_' + username; }
+  function getPrivateCleared(username) {
+    if (!username) return [];
+    return _get(privateClearedKey(username), []);
+  }
+  function clearPrivateChat(username) {
+    if (!username) return 0;
+    var ids = getPrivateChat(username).map(function (m) { return m && m.id; }).filter(Boolean);
+    if (!ids.length) { _set(privateKey(username), []); return 0; }
+    var done = getPrivateCleared(username);
+    ids.forEach(function (id) { if (done.indexOf(id) === -1) done.push(id); });
+    if (done.length > 800) done = done.slice(-800);
+    _set(privateClearedKey(username), done);
+    _set(privateKey(username), []);
+    return ids.length;
   }
 
   /* ---------- user blocks (admin action) ----------
@@ -759,7 +803,20 @@ var DataStore = (function () {
 
   /* ---------- subjects ---------- */
   function getSubjects() {
-    return (window.SEED && window.SEED.subjects) || [];
+    var list = (window.SEED && window.SEED.subjects) || [];
+    var teachers = getTeachers();
+    if (!teachers.length) return list;
+    /* The teacher's name is owned by the (synced) teacher record, so an admin
+       edit there must show up on every page. Returns copies — callers must not
+       mutate the seed. */
+    return list.map(function (s) {
+      if (!s) return s;
+      var want = String(s.name || '').trim().toLowerCase();
+      var t = teachers.find(function (x) {
+        return x && String(x.subject || '').trim().toLowerCase() === want;
+      });
+      return t && t.name ? Object.assign({}, s, { teacher: t.name }) : s;
+    });
   }
   function getSubjectContent() { return _get(KEYS.subjectContent, {}); }
   function setSubjectContent(name, data) {
@@ -922,6 +979,7 @@ var DataStore = (function () {
     getFiles: getFiles, addFile: addFile, removeFile: removeFile,
     getPyqs: getPyqs, addPyq: addPyq, removePyq: removePyq,
     getPrivateChat: getPrivateChat, addPrivateMessage: addPrivateMessage,
+    getPrivateCleared: getPrivateCleared, clearPrivateChat: clearPrivateChat,
     getBlock: getBlock, blockUser: blockUser, unblockUser: unblockUser,
     isBlocked: isBlocked, getBlocks: getBlocks, getBlocksRaw: getBlocksRaw,
     timeUntil: timeUntil, blockCountdown: blockCountdown,
