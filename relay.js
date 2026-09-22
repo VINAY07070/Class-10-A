@@ -26,15 +26,47 @@
   /* Several free public relays with the same simple API. If one is down or
      rate-limited we rotate to the next, so sync keeps working unattended. */
   var SERVERS = ['https://ntfy.sh', 'https://ntfy.envs.net', 'https://ntfy.mzte.de'];
+  /* A relay that is blocked or blackholed does not reject a request — it just
+     never answers. Failover that only runs on rejection therefore never fires,
+     and every sync attempt (plus the catch-up poll) hangs until the browser
+     gives up. Every request gets its own deadline so a silent relay is treated
+     as a failure and the next one is tried. */
+  var FETCH_TIMEOUT = 8000;
+  var WATCHDOG_MS = 9000;   /* how long to wait for the SSE stream to open */
+  function fetchWithTimeout(url, opts, ms) {
+    var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var o = opts || {}, timer = 0;
+    if (ctl) {
+      o.signal = ctl.signal;
+      timer = setTimeout(function () { try { ctl.abort(); } catch (e) {} }, ms || FETCH_TIMEOUT);
+    }
+    function clear() { if (timer) { clearTimeout(timer); timer = 0; } }
+    return fetch(url, o).then(function (r) { clear(); return r; },
+                             function (e) { clear(); throw e; });
+  }
   var serverIdx = 0;
   function base() { return SERVERS[serverIdx]; }
-  function rotate() {
+  /* Remember the relay that actually answered, so a device that reloads does
+     not pay the discovery cost again. */
+  function rememberHost(i) {
+    if (serverIdx === i) return;
+    serverIdx = i;
+    try { var cfg = rawGet('aia_relay_cfg', {}) || {}; cfg.host = SERVERS[i]; rawSet('aia_relay_cfg', cfg); } catch (e) {}
+  }
+  function rotate(note) {
     serverIdx = (serverIdx + 1) % SERVERS.length;
-    setStatus('starting', 'Switching to a backup relay');
+    try { var cfg = rawGet('aia_relay_cfg', {}) || {}; cfg.host = SERVERS[serverIdx]; rawSet('aia_relay_cfg', cfg); } catch (e) {}
+    setStatus('starting', note || 'Switching to a backup relay');
   }
   var PUSH_DEBOUNCE = 140;      /* ms — keeps sending snappy but batched */
   var BACKSTOP_POLL = 4000;     /* ms — reliable poll (SSE is used when it stays up) */
-  var CATCHUP_WINDOW = '12h';   /* first connect only — later loads are incremental */
+  /* ntfy keeps topic history for a limited time, so this is the widest net
+     we can cast for a device that has been offline for a while. */
+  var CATCHUP_WINDOW = '168h';  /* 7 days */
+  /* If a device has not been seen for longer than this, ask for the whole
+     window again rather than a delta from a cursor that predates the
+     relay's retained history. */
+  var MAX_DELTA_AGE = 6 * 3600 * 1000;
   var MAX_BYTES = 3600;         /* keep every post well under the relay cap */
   var LAST_SEEN_KEY = 'aia_relay_last_seen';
 
@@ -48,21 +80,21 @@
     aia_pyqs: 'pq', aia_blocks: 'bk',
     aia_presence: 'pr', aia_ai_log: 'ag', aia_chat_mode: 'cm2',
     aia_files: 'fl', aia_credentials_overrides: 'co',
-    aia_class_chat_deleted: 'cd', aia_activity_log: 'al'
+    aia_class_chat_deleted: 'cd', aia_activity_log: 'al',
+    aia_tombstones: 'tb', aia_ai_shared: 'as', aia_theme_plain: 'tp'
   };
   var LONG = {};
   Object.keys(SHORT).forEach(function (k) { LONG[SHORT[k]] = k; });
 
   function shortKey(k) {
     if (SHORT[k]) return SHORT[k];
-    if (k.indexOf('aia_ai_chat_') === 0) return 'u:' + k.slice(12);
+    /* aia_ai_chat_* is a student's private conversation with the AI. The room
+       is public and readable by anyone who knows its name, so these keys must
+       never be published — an earlier version mapped them to a per-user code
+       and shipped them, which exposed one student's questions to the class. */
     return null;
   }
-  function longKey(s) {
-    if (LONG[s]) return LONG[s];
-    if (s.indexOf('u:') === 0) return 'aia_ai_chat_' + s.slice(2);
-    return null;
-  }
+  function longKey(s) { return LONG[s] || null; }
 
   /* -------- tiny helpers -------- */
   function rawGet(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -73,6 +105,12 @@
   var settings = rawGet('aia_relay_cfg', {}) || {};
   var room = String(settings.room || DEFAULT_ROOM).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || DEFAULT_ROOM;
   var enabled = settings.enabled !== false;
+  /* Start on whichever relay answered last time, so a device that has already
+     discovered a working host does not stall on a dead one again. */
+  if (settings.host) {
+    var hi = SERVERS.indexOf(settings.host);
+    if (hi >= 0) serverIdx = hi;
+  }
 
   var seen = {}, lastTime = 0, status = enabled ? 'starting' : 'off';
   var es = null, dirty = {}, pushTimer = 0, pollTimer = 0, reconnectTimer = 0, sseFails = 0;
@@ -80,18 +118,29 @@
   /* Catch-up cursor. Captured at module load, before the live stream can
      touch lastTime, so the first sync really does replay recent history. */
   var bootSince = 0, catchupDone = false;
+  var bootAt = Date.now();
   try { lastTime = Number(localStorage.getItem(LAST_SEEN_KEY) || 0) || 0; } catch (e) {}
-  bootSince = lastTime || CATCHUP_WINDOW;
-  /* A device that already synced recently does not need the whole window
-     again on every page load — only a fresh device does. */
-  catchupDone = !!lastTime;
+  /* The cursor is a relay timestamp in SECONDS; normalise it so an old
+     millisecond value cannot be mistaken for a very recent time. */
+  if (lastTime > 1e12) lastTime = Math.floor(lastTime / 1000);
+  /* Only skip the history replay when the cursor is genuinely recent. A
+     device that was away for days must replay, otherwise it silently misses
+     everything the admin changed while it was offline. */
+  var cursorFresh = lastTime && (bootAt - lastTime * 1000) < MAX_DELTA_AGE;
+  bootSince = cursorFresh ? lastTime : CATCHUP_WINDOW;
+  catchupDone = !!cursorFresh;
   function markSeen(t) {
     if (!t) return;
+    t = Number(t) || 0;
+    if (t > 1e12) t = Math.floor(t / 1000);   /* accept ms too */
     lastTime = Math.max(lastTime, t);
     try { localStorage.setItem(LAST_SEEN_KEY, String(lastTime)); } catch (e) {}
   }
 
-  function saveSettings() { rawSet('aia_relay_cfg', { room: room, enabled: enabled }); }
+  function saveSettings() {
+    var prev = rawGet('aia_relay_cfg', {}) || {};
+    rawSet('aia_relay_cfg', { room: room, enabled: enabled, host: prev.host || SERVERS[serverIdx] });
+  }
 
   function setStatus(s, note) {
     status = s;
@@ -141,6 +190,62 @@
     });
     flush();
     queue.forEach(post);
+  }
+
+  /* -------- full-state beacon --------
+     BroadcastChannel covers same-origin tabs, and the stream covers anything
+     posted while a device was online. Neither helps a phone that was closed
+     while the admin made changes and whose relay history has since expired.
+     So a joining device asks for the state, and whoever has it replays the
+     whole thing (chunked) into the room. */
+  var lastAnswered = 0, helloSoon = 0;
+  function answerState() {
+    if (!window.AiaSync || !window.AiaSync.snapshot) return;
+    var snap;
+    try { snap = window.AiaSync.snapshot({ photos: false, ai: false, activity: false }); }
+    catch (e) { return; }
+    if (!snap || !snap.data) return;
+    var entries = Object.keys(snap.data);
+    if (!entries.length) return;
+    /* Split into small chunks so no single post hits the relay's size cap. */
+    var chunk = {}, chunkBytes = 0, parts = [];
+    function flushChunk() {
+      if (!Object.keys(chunk).length) return;
+      parts.push(chunk); chunk = {}; chunkBytes = 0;
+    }
+    entries.forEach(function (k) {
+      var sk = shortKey(k);
+      if (!sk) return;
+      var v;
+      try { v = JSON.stringify(snap.data[k]); } catch (e) { return; }
+      if (k === 'aia_ai_config') v = stripAiSecrets(v);
+      if (k === 'aia_ai_log') return;
+      if (v == null) return;
+      var size = sk.length + v.length + 8;
+      if (chunkBytes + size > MAX_BYTES) flushChunk();
+      chunk[sk] = v; chunkBytes += size;
+    });
+    flushChunk();
+    parts.forEach(function (part) {
+      post(JSON.stringify({ a: 'a10a', f: device.id, n: device.name, q: 'state', d: part }));
+    });
+  }
+  /* Only one device needs to answer, and it should not answer every join.
+     A short jitter keeps several devices from replying at the same instant. */
+  function maybeAnswerHello() {
+    if (!enabled) return;
+    var now = Date.now();
+    if (now - lastAnswered < 20000) return;
+    if (helloSoon) return;
+    helloSoon = setTimeout(function () {
+      helloSoon = 0;
+      lastAnswered = Date.now();
+      answerState();
+    }, 400 + Math.random() * 1600);
+  }
+  function sayHello() {
+    if (!enabled) return;
+    post(JSON.stringify({ a: 'a10a', f: device.id, n: device.name, q: 'hello', d: {} }));
   }
 
   /* Defence in depth: even if a stale config blob still carries a key, it
@@ -206,23 +311,51 @@
     } catch (e) { return '[]'; }
   }
 
-  function post(body, i) {
-    i = i || 0;
-    try {
-      fetch(SERVERS[i] + '/' + room, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: body,
-        cache: 'no-store'
-      }).then(function (r) {
-        if (r.status === 429 || r.status >= 500) {
-          /* Try the next relay so the message always lands somewhere others read. */
-          if (i + 1 < SERVERS.length) { serverIdx = i + 1; post(body, i + 1); } else fails();
-        }
-      }).catch(function () {
-        if (i + 1 < SERVERS.length) { serverIdx = i + 1; post(body, i + 1); } else fails();
-      });
-    } catch (e) { fails(); }
+  /* Publishers send to EVERY relay, not just one. The public ntfy mirrors are
+     independent servers: a message posted to envs.net is invisible on
+     mzte.de and vice versa. Devices pick whichever host answered for them,
+     so publishing to a single relay meant a reader on a different mirror
+     only learned about the message on its next all-relay safety poll — the
+     ~30s "chat sync is broken" delay. Fanning out costs one small POST per
+     relay and makes delivery immediate whichever mirror each device chose. */
+  /* A relay that just timed out is skipped for a while. Without this, every
+     catch-up waited out the dead host's full 8s deadline before the batch
+     finished — which is what made every sync feel slow even when a healthy
+     mirror answered instantly. */
+  var downUntil = {}, DOWN_MS = 60000;
+  function markUp(i) { delete downUntil[i]; }
+  function liveServers() {
+    var now = Date.now(), out = [];
+    for (var i = 0; i < SERVERS.length; i++) if (!downUntil[i] || downUntil[i] <= now) out.push(i);
+    /* Cooldown is an optimisation, not a circuit breaker: if every relay is
+       cooling down, still ask them rather than going silent. */
+    if (!out.length) for (var j = 0; j < SERVERS.length; j++) out.push(j);
+    return out;
+  }
+
+  function post(body) {
+    var anyOk = false;
+    var preferred = serverIdx;
+    var order = [preferred];
+    for (var i = 0; i < SERVERS.length; i++) if (i !== preferred) order.push(i);
+    order.forEach(function (idx, n) {
+      try {
+        fetchWithTimeout(SERVERS[idx] + '/' + room, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: body,
+          cache: 'no-store'
+        }).then(function (r) {
+          if (!r.ok || r.status === 429 || r.status >= 500) return;
+          anyOk = true;
+          /* The preferred relay is the first in `order`, so a healthy answer
+             from it can be trusted as this device's primary host. */
+          if (n === 0) serverIdx = idx;
+        }).catch(function () {}).then(function () {
+          if (n === order.length - 1 && !anyOk) fails();
+        });
+      } catch (e) { if (n === order.length - 1 && !anyOk) fails(); }
+    });
   }
   function fails() { sseFails++; if (sseFails >= 3) setStatus('error', 'Relay unreachable — local sync unaffected'); }
 
@@ -232,6 +365,10 @@
     if (msg.f === device.id) return;               /* our own echo */
     if (fromNtfy && seen[fromNtfy]) return;
     if (fromNtfy) seen[fromNtfy] = 1;
+    /* A device that has just joined asks for the current state. Anyone who
+       has it answers, so a phone opening the site gets everything at once
+       even if the relay's own history has already expired. */
+    if (msg.q === 'hello') { maybeAnswerHello(); return; }
     if (!window.AiaSync || !msg.d) return;
     var data = {};
     Object.keys(msg.d).forEach(function (sk) {
@@ -284,19 +421,39 @@
     if (!enabled) return;
     if (typeof EventSource === 'undefined') { setPolling(8000); return; }
     if (es) return;                       /* never stack connections */
+    var opened = false;
     try {
       es = new EventSource(base() + '/' + room + '/sse');
     } catch (e) { setPolling(8000); return; }
+    /* A dead relay leaves the EventSource sitting in CONNECTING forever with
+       no error, so the stream never reports failure and the device stays
+       silently offline. If it has not opened in time, treat it as an error
+       and fail over. */
+    var watchdog = setTimeout(function () {
+      if (opened) return;
+      closeStream();
+      sseFails++;
+      rotate('No answer from the live relay — trying a backup');
+      setPolling(5000);
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connect, 1500);
+    }, WATCHDOG_MS);
     es.onopen = function () {
+      opened = true;
+      clearTimeout(watchdog);
       sseFails = 0;
+      rememberHost(SERVERS.indexOf(base()));
       setStatus('live');
       setPolling(30000);                  /* SSE healthy → occasional safety poll */
+      sayHello();                         /* ask whoever is online for the state */
       /* Reconcile anything we missed while the stream was down (or, on a
          first load, whatever was already in the room). */
       catchUp();
     };
     es.onmessage = function (ev) { handleNtfyEvent(ev); };
     es.onerror = function () {
+      opened = true;                      /* stop the watchdog duplicating this path */
+      clearTimeout(watchdog);
       closeStream();
       sseFails++;
       setStatus('error', 'Live link dropped — catching up');
@@ -305,6 +462,8 @@
          faster. Reset happens on a successful open. */
       var wait = Math.min(4000 * Math.pow(1.7, Math.min(sseFails - 1, 5)), 90000);
       setPolling(Math.min(5000 * sseFails, 60000));
+      /* Repeated early failures mean this host is not working at all — move on. */
+      if (sseFails >= 2) rotate('Live relay unresponsive — switching relay');
       clearTimeout(reconnectTimer);
       reconnectTimer = setTimeout(connect, wait);
     };
@@ -384,15 +543,28 @@
       : (lastTime || CATCHUP_WINDOW);
     catchupDone = true;
 
-    function tryServer(i, sawAny) {
-      if (i >= SERVERS.length) {
-        catchingUp = false;
-        if (!sawAny && rateLimited) {
-          setPolling(Math.min((pollEvery || 5000) * 2, 60000));
-        }
-        return;
+    /* Read from EVERY relay, not just the first that answers. Devices pick a
+       relay independently (whichever responded for them), so a message may
+       have been published to any of them; stopping at the first host with
+       history would silently miss whatever another device posted elsewhere.
+       Message ids are deduplicated in ingestLine(), so overlapping history is
+       harmless. */
+    var rateLimited = false, pending = 0, any = false;
+    function finish() {
+      pending--;
+      if (pending > 0) return;
+      catchingUp = false;
+      if (!any) {
+        rotate('Relays not answering — trying a backup');
+        if (rateLimited) setPolling(Math.min((pollEvery || 5000) * 2, 60000));
       }
-      fetch(SERVERS[i] + '/' + room + '/json?poll=1&since=' + since,
+    }
+    var idxs = liveServers();
+    pending = idxs.length;
+    if (!pending) { catchingUp = false; return; }
+    idxs.forEach(function (idx) {
+      var host = SERVERS[idx];
+      fetchWithTimeout(host + '/' + room + '/json?poll=1&since=' + since,
             { cache: 'no-store' })
         .then(function (r) {
           if (r.status === 429 || r.status >= 500) { rateLimited = true; return null; }
@@ -400,16 +572,15 @@
           return r.text();
         })
         .then(function (text) {
-          /* A non-empty body means this relay is healthy and has the room.
-             Stop here — the backups mirror the same room, so fetching them
-             as well would only repeat hundreds of KB we already processed. */
-          if (!text || !text.length) { tryServer(i + 1, sawAny); return; }
-          ingest(text, function () { catchingUp = false; });
+          if (text === null) { finish(); return; }
+          markUp(idx);
+          if (!any) rememberHost(idx);        /* first relay to answer wins */
+          any = true;
+          if (!text.length) { finish(); return; }
+          ingest(text, finish);
         })
-        .catch(function () { tryServer(i + 1, sawAny); });
-    }
-    var rateLimited = false;
-    tryServer(0, false);
+        .catch(function () { downUntil[idx] = Date.now() + DOWN_MS; finish(); });
+    });
   }
 
   /* -------- local change → publish -------- */
@@ -432,6 +603,9 @@
       connect();
       setPolling(5000);                   /* reliable poll until SSE is healthy */
       setTimeout(function () { catchUp(); }, 400);   /* replay history as early as possible */
+      /* Also ask live peers for their state: covers the case where this
+         device was away long enough for the relay history to have expired. */
+      setTimeout(sayHello, 1200);
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

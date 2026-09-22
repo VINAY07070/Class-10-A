@@ -67,6 +67,11 @@
   ['aia_students', 'aia_teachers', 'aia_leadership', 'aia_ai_config', 'aia_github_data',
    'aia_credentials_overrides', 'aia_theme_plain', 'aia_chat_mode'
   ].forEach(function (k) { def(k, LWW); });
+  /* The admin's opt-in shared AI setup. It is meant to reach every device, so
+     the wrapped key blob travels with it. This is the one AI key that is
+     deliberately synced; the admin's own `aia_ai_config` key is stripped in
+     writeKey() below and never leaves their device. */
+  def('aia_ai_shared', LWW);
   def('aia_theme', LWW); // note: stored as raw string, handled specially
   def('aia_homework', UNION, 300);
   def('aia_files', UNION, 120);
@@ -76,7 +81,8 @@
   def('aia_test_scores', UNION, 600);
   def('aia_class_chat', UNION, 500);
   def('aia_class_chat_deleted', UNION, 600);
-  def('aia_ai_log', UNION, 400);
+  /* aia_ai_log is intentionally absent: it holds AI conversations, which
+     stay on the device that had them. */
   def('aia_activity_log', UNION, 400);
   def('aia_presence', MAP, 60);
   def('aia_comments', MAP, 0);
@@ -85,15 +91,57 @@
   def('aia_student_profiles', PROFILES, 120);
   def('aia_subject_content', SUBJ);
   def('aia_subject_photos', PHOTOS);
+  /* Deletions. A list merged as UNION can only ever grow: a device that
+     still holds a removed item re-adds it on the next sync, which is why a
+     score the admin deleted kept coming back. Anything removed is recorded
+     here, and every merge drops items whose id is in the list. */
+  def('aia_tombstones', MAP, 0);
 
+  /* A student's conversation with the AI is private to them, so the
+     per-user history keys (aia_ai_chat_*) are deliberately NOT syncable.
+     Sending them to the shared room would show one student's questions to
+     everyone. `aia_ai_log` (the admin's copy of those chats) is likewise
+     device-local. */
   function isSyncedKey(k) {
-    if (SYNC_DEFS[k]) return true;
-    return k && k.indexOf('aia_ai_chat_') === 0;
+    if (k && k.indexOf('aia_ai_chat_') === 0) return false;
+    return !!SYNC_DEFS[k];
   }
   function kindOf(k) {
     if (SYNC_DEFS[k]) return SYNC_DEFS[k].kind;
-    if (k.indexOf('aia_ai_chat_') === 0) return CHATKEYS;
+    if (k && k.indexOf('aia_ai_chat_') === 0) return null;
     return null;
+  }
+
+  /* ---------------- deletions ----------------
+     itemId() has to agree with the merge engine, so it is shared below. */
+  var TOMB_KEY = 'aia_tombstones';
+  function tombstoneMap() { var m = rawGet(TOMB_KEY); return (m && typeof m === 'object') ? m : {}; }
+  function tombstoneIds(key) {
+    var m = tombstoneMap();
+    return (m && Array.isArray(m[key])) ? m[key] : [];
+  }
+  /* Record that `ids` were deliberately removed from `key`. */
+  function markDeleted(key, ids) {
+    if (!key || !ids || !ids.length) return 0;
+    var m = tombstoneMap();
+    var list = Array.isArray(m[key]) ? m[key].slice() : [];
+    var added = 0;
+    ids.forEach(function (id) { id = String(id || ''); if (id && list.indexOf(id) === -1) { list.push(id); added++; } });
+    if (!added) return 0;
+    m[key] = list.slice(-800);
+    rawSet(TOMB_KEY, m);
+    touchMeta(TOMB_KEY);
+    if (!window.__aiaApplying) {
+      try { document.dispatchEvent(new CustomEvent('aia-local-write', { detail: { key: TOMB_KEY } })); } catch (e) {}
+    }
+    return added;
+  }
+  /* Drop anything in `arr` that was deleted on some device. */
+  function applyTombstones(key, arr) {
+    if (!Array.isArray(arr)) return arr;
+    var dead = tombstoneIds(key);
+    if (!dead.length) return arr;
+    return arr.filter(function (it, i) { return dead.indexOf(String(itemId(it, i))) === -1; });
   }
 
   /* theme is stored as a plain string, not JSON */
@@ -184,11 +232,22 @@
     if (kind === LWW) {
       var a = JSON.stringify(localV), b = JSON.stringify(remoteV);
       if (a === b) return { value: localV, changed: false, added: 0 };
+      /* Catch-up merges history from several relays at once, so "remote"
+         can arrive out of order — a stale copy following a newer one would
+         otherwise win and silently roll a setting back. When both sides carry
+         a timestamp, the genuinely newer value wins; otherwise the incoming
+         one does (arrival order), matching the previous behaviour. */
+      var ta = tsOf(localV), tb = tsOf(remoteV);
+      if (ta && tb && tb < ta) return { value: localV, changed: false, added: 0 };
       return { value: remoteV, changed: true, added: 1, conflict: true };
     }
     if (kind === UNION || kind === CHATKEYS) {
       var byTime = (kind === CHATKEYS) || BY_TIME_KEYS[key] === 1;
       var r = unionMerge(localV, remoteV, cap, byTime);
+      /* A removed item must not come back just because an older copy of the
+         list still exists on another device. */
+      var alive = applyTombstones(key, r.value);
+      if (alive.length !== r.value.length) { r.value = alive; r.changed = true; }
       /* chat tombstones win: never resurrect a message the class deleted */
       if (key === 'aia_class_chat') {
         var dead = SYNC_DEFS['aia_class_chat_deleted'] ? readKey('aia_class_chat_deleted') : null;
@@ -206,9 +265,12 @@
     }
     if (kind === MAP) {
       var mm = Object.assign({}, localV), ad = 0;
+      /* the deletion list is the longest-lived map we keep, so it gets a
+         larger cap than the profile map */
+      var mapCap = (key === TOMB_KEY) ? 800 : 200;
       Object.keys(remoteV || {}).forEach(function (k) {
         if (Array.isArray(remoteV[k])) {
-          var r = unionMerge(mm[k], remoteV[k], 200);
+          var r = unionMerge(mm[k], remoteV[k], mapCap);
           mm[k] = r.value; ad += r.added;
         } else if (mm[k] === undefined) { mm[k] = remoteV[k]; ad++; }
         else if (JSON.stringify(mm[k]) !== JSON.stringify(remoteV[k])) { mm[k] = newerOf(mm[k], remoteV[k]); ad++; }
@@ -258,6 +320,8 @@
         if (s[k] === undefined) { s[k] = remoteV[k]; ad4++; }
         else { var w = newerOf(s[k], remoteV[k]); if (JSON.stringify(w) !== JSON.stringify(s[k])) { s[k] = w; ad4++; } }
       });
+      var deadSubj = tombstoneIds(key);
+      deadSubj.forEach(function (k) { if (s[k] !== undefined) { delete s[k]; ad4++; } });
       return { value: s, changed: ad4 > 0, added: ad4 };
     }
     if (kind === PHOTOS) {
@@ -272,13 +336,64 @@
         });
         ph[subj] = la.slice(-24);
       });
+      tombstoneIds(key).forEach(function (subj) { if (ph[subj] !== undefined) { delete ph[subj]; ad5++; } });
       return { value: ph, changed: ad5 > 0, added: ad5 };
     }
     return { value: localV, changed: false, added: 0 };
   }
 
   var lastSyncAt = 0, lastSyncInfo = 'never';
+  /* The deletion list can arrive on its own, or long after the list it
+     refers to. Sweep every list a tombstone mentions so a late-arriving
+     "this was deleted" still takes effect here. */
+  function sweepTombstones() {
+    var touched = 0;
+    Object.keys(SYNC_DEFS).forEach(function (k) {
+      if (!tombstoneIds(k).length) return;
+      var kind = kindOf(k);
+      if (kind === SUBJ) {
+        var all = readKey(k);
+        if (all && typeof all === 'object') {
+          var copy = Object.assign({}, all), drop = false;
+          tombstoneIds(k).forEach(function (n) { if (copy[n] !== undefined) { delete copy[n]; drop = true; } });
+          if (drop) { writeKey(k, copy); touched++; }
+        }
+        return;
+      }
+      if (kind === PHOTOS) {
+        var ph = readKey(k);
+        if (ph && typeof ph === 'object') {
+          var cp = {}, changed = false;
+          Object.keys(ph).forEach(function (n) {
+            if (tombstoneIds(k).indexOf(n) !== -1) { changed = true; return; }
+            cp[n] = ph[n];
+          });
+          if (changed) { writeKey(k, cp); touched++; }
+        }
+        return;
+      }
+      if (kind !== UNION && kind !== CHATKEYS) return;
+      var cur = readKey(k);
+      if (!Array.isArray(cur)) return;
+      var kept = applyTombstones(k, cur);
+      if (kept.length !== cur.length) { writeKey(k, kept); touched++; }
+    });
+    if (touched) document.dispatchEvent(new CustomEvent('aia-data-change', { detail: { key: 'aia_tombstones' } }));
+    return touched;
+  }
+
   function applyRemote(key, remoteV, from) {
+    if (key === TOMB_KEY) {
+      var tm = mergeValues(key, localForMerge(key), remoteV);
+      if (tm.changed) {
+        writeKey(key, tm.value);
+        meta[key] = { rev: (meta[key] && meta[key].rev || 0) + 1, at: Date.now(), by: from || 'remote' };
+        saveMeta();
+      }
+      sweepTombstones();
+      try { window.dispatchEvent(new Event('aia-sync')); } catch (e) {}
+      return tm.changed ? 1 : 0;
+    }
     if (!isSyncedKey(key)) return 0;
     var m = mergeValues(key, localForMerge(key), remoteV);
     if (!m.changed) return 0;
@@ -343,22 +458,15 @@
   window.addEventListener('beforeunload', function () { bcPost({ t: 'bye', from: device.id }); });
 
   /* ---------------- snapshot / codes / files ---------------- */
-  function allSyncKeys() {
-    var keys = Object.keys(SYNC_DEFS);
-    try {
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf('aia_ai_chat_') === 0 && keys.indexOf(k) === -1) keys.push(k);
-      }
-    } catch (e) {}
-    return keys;
-  }
+  /* Only the declared keys. AI chat history is per-device and is
+     deliberately excluded. */
+  function allSyncKeys() { return Object.keys(SYNC_DEFS); }
   function snapshot(opts) {
     opts = opts || {};
     var data = {};
     allSyncKeys().forEach(function (k) {
       if (!opts.photos && k === 'aia_subject_photos') return;
-      if (!opts.ai && (k === 'aia_ai_log' || k.indexOf('aia_ai_chat_') === 0)) return;
+      if (k === 'aia_ai_log' || k.indexOf('aia_ai_chat_') === 0) return;
       if (!opts.activity && (k === 'aia_activity_log' || k === 'aia_presence')) return;
       var v = readKey(k);
       if (v !== undefined && v !== null) data[k] = v;
@@ -514,7 +622,7 @@
   var serverMode = false, serverTimer = null, pushTimer = null, serverFails = 0;
   var serverOptIn = false;
   try { serverOptIn = window.AIA_SERVER_HUB === true; } catch (e) { serverOptIn = false; }
-  var TO_SHORT = { aia_students: 'students', aia_student_profiles: 'student_profiles', aia_teachers: 'teachers', aia_leadership: 'leadership', aia_homework: 'homework', aia_announcements: 'announcements', aia_polls: 'polls', aia_test_scores: 'test_scores', aia_class_chat: 'class_chat', aia_comments: 'comments', aia_poll_votes: 'poll_votes', aia_subject_content: 'subject_content', aia_subject_photos: 'subject_photos', aia_ai_config: 'ai_config', aia_theme: 'theme', aia_activity_log: 'activity_log' };
+  var TO_SHORT = { aia_students: 'students', aia_student_profiles: 'student_profiles', aia_teachers: 'teachers', aia_leadership: 'leadership', aia_homework: 'homework', aia_announcements: 'announcements', aia_polls: 'polls', aia_test_scores: 'test_scores', aia_class_chat: 'class_chat', aia_comments: 'comments', aia_poll_votes: 'poll_votes', aia_subject_content: 'subject_content', aia_subject_photos: 'subject_photos', aia_ai_config: 'ai_config', aia_theme: 'theme', aia_activity_log: 'activity_log', aia_tombstones: 'tombstones', aia_ai_shared: 'ai_shared' };
   var TO_LONG = {}; Object.keys(TO_SHORT).forEach(function (k) { TO_LONG[TO_SHORT[k]] = k; });
   function serverPull() {
     fetch('/api/state', { credentials: 'include', cache: 'no-store' }).then(function (r) {
@@ -758,6 +866,22 @@
     exportCode: function (full) { return encodeSnap(snapshot(full ? { photos: true, ai: true, activity: true } : { photos: false, ai: false, activity: false })); },
     importCode: function (s) { var snap = decodeSnap(s); return snap ? mergeSnapshot(snap) : null; },
     peers: function () { return Object.keys(peers).length; },
-    typing: function (user, name) { bcPost({ t: 'typing', user: user, name: name, from: device.id }); p2pBroadcast({ t: 'typing', user: user, name: name, from: device.id }); }
+    typing: function (user, name) { bcPost({ t: 'typing', user: user, name: name, from: device.id }); p2pBroadcast({ t: 'typing', user: user, name: name, from: device.id }); },
+    /* Deletions. Anything removed locally must be announced, otherwise the
+       next device to sync re-adds it from its own stale copy. */
+    markDeleted: markDeleted,
+    deletedIds: tombstoneIds,
+    /* The one true item identity. Callers must use this when recording a
+       deletion, otherwise the tombstone never matches at merge time. */
+    itemId: itemId,
+    loadTombstones: function () { return tombstoneMap(); },
+    saveTombstones: function (m) {
+      if (!m || typeof m !== 'object') return;
+      rawSet(TOMB_KEY, m);
+      touchMeta(TOMB_KEY);
+      if (!window.__aiaApplying) {
+        try { document.dispatchEvent(new CustomEvent('aia-local-write', { detail: { key: TOMB_KEY } })); } catch (e) {}
+      }
+    }
   };
 })();

@@ -31,6 +31,51 @@
   var APP_SALT = 'aia10a-pc-v1';
   var POLL_MS = 3500;
   var MAX_BYTES = 3000;
+  /* A blocked or blackholed relay never answers — the request just hangs, so
+     failover driven only by rejection never happens. Give every request a
+     deadline and treat silence as a failure. */
+  var FETCH_TIMEOUT = 8000;
+  function fetchWithTimeout(url, opts, ms) {
+    var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var o = opts || {}, timer = 0;
+    if (ctl) {
+      o.signal = ctl.signal;
+      timer = setTimeout(function () { try { ctl.abort(); } catch (e) {} }, ms || FETCH_TIMEOUT);
+    }
+    function clear() { if (timer) { clearTimeout(timer); timer = 0; } }
+    return fetch(url, o).then(function (r) { clear(); return r; },
+                             function (e) { clear(); throw e; });
+  }
+  /* Remember the relay that last worked here, per conversation, so polling
+     does not rediscover a dead host on every cycle. */
+  var goodHost = {};
+  var HOST_KEY = 'aia_pv_host';
+  try { var savedHost = localStorage.getItem(HOST_KEY); if (savedHost && SERVERS.indexOf(savedHost) >= 0) goodHost._ = savedHost; } catch (e) {}
+  /* A relay that just timed out is not asked again for a while. Without this
+     every poll cycle waited out the full 8s deadline of the dead host before
+     the batch could complete, which is what made private messages take ~12s
+     even when a healthy mirror answered in milliseconds. */
+  var downUntil = {}, DOWN_MS = 60000;
+  function markDown(i) { downUntil[i] = Date.now() + DOWN_MS; }
+  function markUp(i) { delete downUntil[i]; }
+  function liveServers() {
+    var now = Date.now(), out = [];
+    for (var i = 0; i < SERVERS.length; i++) if (!downUntil[i] || downUntil[i] <= now) out.push(i);
+    /* If everything is cooling down, ask them all anyway rather than going
+       quiet — the cooldown is an optimisation, not a circuit breaker. */
+    if (!out.length) for (var j = 0; j < SERVERS.length; j++) out.push(j);
+    return out;
+  }
+
+  function startHost(user) {
+    var h = goodHost[user] || goodHost._;
+    var i = h ? SERVERS.indexOf(h) : -1;
+    return i >= 0 ? i : 0;
+  }
+  function noteHost(user, i) {
+    goodHost[user] = SERVERS[i];
+    try { localStorage.setItem(HOST_KEY, SERVERS[i]); } catch (e) {}
+  }
 
   function enc(s) {
     try { return btoa(unescape(encodeURIComponent(s))); } catch (e) { return ''; }
@@ -90,29 +135,35 @@
     }).catch(function () { return ''; });
   }
 
+  /* Private chat publishes to every relay for the same reason the class room
+     does: the mirrors are independent servers, so a message sent to one is
+     invisible on the others. A recipient polling a different mirror would
+     otherwise see the conversation only on a later sweep — or not at all. */
   function post(user, body, i) {
-    i = i || 0;
-    return fetch(SERVERS[i] + '/' + roomFor(user), {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(body),
-      cache: 'no-store'
-    }).then(function (r) {
-      if (r.status === 429 || r.status >= 500) {
-        if (i + 1 < SERVERS.length) return post(user, body, i + 1);
+    var wire = JSON.stringify(body);
+    var order = [startHost(user)];
+    for (var n = 0; n < SERVERS.length; n++) if (order.indexOf(n) === -1) order.push(n);
+    return Promise.all(order.map(function (idx) {
+      return fetchWithTimeout(SERVERS[idx] + '/' + roomFor(user), {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: wire,
+        cache: 'no-store'
+      }).then(function (r) {
+        if (r.ok && r.status !== 429 && r.status < 500) { noteHost(user, idx); return r; }
         return null;
-      }
-      return r;
-    }).catch(function () {
-      if (i + 1 < SERVERS.length) return post(user, body, i + 1);
-      return null;
-    });
+      }).catch(function () { return null; });
+    })).then(function (rs) { return rs[0]; });
   }
 
   /* Send one message. `msg` carries the plain fields; the text is encrypted. */
   function send(user, msg) {
     var env = {
-      id: msg.id, from: msg.from, name: msg.name, role: msg.role,
+      /* The listener drops any envelope without an id, so a missing one must
+         never reach the wire — otherwise the message is stored locally but
+         silently disappears for the recipient. */
+      id: msg.id || ('pv-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)),
+      from: msg.from, name: msg.name, role: msg.role,
       at: msg.at || new Date().toISOString()
     };
     return encrypt(user, msg.text || '').then(function (payload) {
@@ -135,16 +186,40 @@
     var stopped = false, seen = {}, timer = 0;
     var known = opts.known || {};
 
+    /* Ask every live relay and merge what comes back. Devices choose a relay
+       independently, so a message can be sitting on any of them; stopping at
+       the first answer would miss the rest. Ids are deduplicated below. */
+    function pollAll(cursor, cb) {
+      var idxs = liveServers(), remaining = idxs.length, batches = [];
+      if (!remaining) { cb(batches); return; }
+      idxs.forEach(function (i) {
+        var host = SERVERS[i];
+        fetchWithTimeout(host + '/' + roomFor(user) + '/json?poll=1&since=' + encodeURIComponent(cursor),
+              { cache: 'no-store' })
+          .then(function (r) {
+            if (r.status === 429 || r.status >= 500) return null;
+            if (!r.ok) return null;
+            return r.text();
+          })
+          .then(function (txt) {
+            if (txt != null) { markUp(i); noteHost(user, i); batches.push(txt); }
+            else markDown(i);
+          })
+          .catch(function () { markDown(i); })
+          .then(function () {
+            remaining--;
+            if (remaining === 0) cb(batches);
+          });
+      });
+    }
+
     function tick() {
       if (stopped) return;
-      var url = SERVERS[0] + '/' + roomFor(user) + '/json?poll=1&since=' + encodeURIComponent(since);
-      fetch(url, { cache: 'no-store' })
-        .then(function (r) { return r.ok ? r.text() : ''; })
-        .then(function (txt) {
-          if (stopped) return;
-          var lines = String(txt || '').split('\n');
-          var raws = [];
-          lines.forEach(function (line) {
+      pollAll(since, function (batches) {
+        if (stopped) return;
+        var raws = [];
+        batches.forEach(function (txt) {
+          String(txt || '').split('\n').forEach(function (line) {
             line = line.trim();
             if (!line) return;
             var ev;
@@ -152,14 +227,20 @@
             if (!ev || ev.event !== 'message' || !ev.message) return;
             if (ev.id && seen[ev.id]) return;
             if (ev.id) seen[ev.id] = 1;
-            if (ev.time) since = ev.time;      /* advance the cursor */
+            /* `since` starts as the string 'all'; only switch it to a numeric
+               cursor once a relay actually reports a timestamp. */
+            if (ev.time) {
+              var t = Number(ev.time);
+              if (t && (!Number.isFinite(since) || t > since)) since = t;
+            }
             var m;
             try { m = JSON.parse(ev.message); } catch (e) { return; }
             if (!m || !m.id) return;
             if (known[m.id]) return;
             raws.push(m);
           });
-          if (!raws.length) return;
+        });
+        if (raws.length) {
           Promise.all(raws.map(function (m) {
             return decrypt(user, m.p).then(function (text) {
               return {
@@ -170,9 +251,9 @@
           })).then(function (out) {
             if (!stopped) onBatch(out.filter(function (m) { return m.text !== ''; }));
           });
-        })
-        .catch(function () {})
-        .then(function () { if (!stopped) timer = setTimeout(tick, POLL_MS); });
+        }
+        if (!stopped) timer = setTimeout(tick, POLL_MS);
+      });
     }
     tick();
     return function stop() { stopped = true; clearTimeout(timer); };

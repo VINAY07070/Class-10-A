@@ -81,6 +81,21 @@ var DataStore = (function () {
     return obj;
   }
 
+  /* Record a deliberate removal so other devices drop the item instead of
+     syncing their old copy back. See sync-bridge.js markDeleted(). */
+  function _markDeleted(key, ids) {
+    try {
+      if (window.AiaSync && window.AiaSync.markDeleted) window.AiaSync.markDeleted(key, ids);
+    } catch (e) {}
+  }
+  function _idsOf(list) {
+    var fn = (window.AiaSync && window.AiaSync.itemId) ? window.AiaSync.itemId : null;
+    return (list || []).map(function (x, i) {
+      if (fn) return fn(x, i);
+      return x && x.id;
+    }).filter(Boolean);
+  }
+
   /* ---------- seed collections ---------- */
   function getStudents() { return _get(KEYS.students, (window.SEED && window.SEED.students) || []); }
   function setStudents(v) { _set(KEYS.students, v); }
@@ -102,7 +117,13 @@ var DataStore = (function () {
   function getHomework() { return _get(KEYS.homework, (window.SEED && window.SEED.homework) || []); }
   function setHomework(v) { _set(KEYS.homework, v); }
   function addHomework(item) { _stamp(item, 'hw'); var l = getHomework(); l.unshift(item); setHomework(l); return 0; }
-  function deleteHomework(i) { var l = getHomework(); l.splice(i, 1); setHomework(l); rebuildCommentKeys('hw_', i); }
+  function deleteHomework(i) {
+    var l = getHomework();
+    var gone = l[i];
+    l.splice(i, 1); setHomework(l);
+    _markDeleted('aia_homework', _idsOf([gone]));
+    rebuildCommentKeys('hw_', i);
+  }
   function getAnnouncements() { return _get(KEYS.announcements, (window.SEED && window.SEED.announcements) || []); }
   function setAnnouncements(v) { _set(KEYS.announcements, v); }
   function addAnnouncement(item) {
@@ -110,7 +131,13 @@ var DataStore = (function () {
     if (!item.date) item.date = item.created_at;
     var l = getAnnouncements(); l.unshift(item); setAnnouncements(l); return 0;
   }
-  function deleteAnnouncement(i) { var l = getAnnouncements(); l.splice(i, 1); setAnnouncements(l); rebuildCommentKeys('ann_', i); }
+  function deleteAnnouncement(i) {
+    var l = getAnnouncements();
+    var gone = l[i];
+    l.splice(i, 1); setAnnouncements(l);
+    _markDeleted('aia_announcements', _idsOf([gone]));
+    rebuildCommentKeys('ann_', i);
+  }
   function getPolls() { return _get(KEYS.polls, (window.SEED && window.SEED.polls) || []); }
   function setPolls(v) { _set(KEYS.polls, v); }
   function addPoll(item) {
@@ -120,7 +147,10 @@ var DataStore = (function () {
     var l = getPolls(); l.unshift(item); setPolls(l); return 0;
   }
   function deletePoll(i) {
-    var l = getPolls(); l.splice(i, 1); setPolls(l);
+    var l = getPolls();
+    var gone = l[i];
+    l.splice(i, 1); setPolls(l);
+    _markDeleted('aia_polls', _idsOf([gone]));
     /* re-index local vote flags so later polls keep their flags */
     var votes = _get(KEYS.pollVotes, {}), next = {};
     Object.keys(votes).forEach(function (k) {
@@ -135,7 +165,12 @@ var DataStore = (function () {
   function getTestScores() { return _get(KEYS.testScores, (window.SEED && window.SEED.test_scores) || []); }
   function setTestScores(v) { _set(KEYS.testScores, v); }
   function addTestScore(item) { _stamp(item, 'score'); var l = getTestScores(); l.unshift(item); setTestScores(l); return 0; }
-  function deleteTestScore(i) { var l = getTestScores(); l.splice(i, 1); setTestScores(l); }
+  function deleteTestScore(i) {
+    var l = getTestScores();
+    var gone = l[i];
+    l.splice(i, 1); setTestScores(l);
+    _markDeleted('aia_test_scores', _idsOf([gone]));
+  }
 
   /* ---------- comments ---------- */
   function getComments(key) { return _get(KEYS.comments, {})[key] || []; }
@@ -638,6 +673,84 @@ var DataStore = (function () {
     cfg.apiKey = getAiKey();
     return cfg;
   }
+  /* ---------- shared AI (admin opt-in) ----------
+     A student with no key of their own would otherwise only ever get the
+     offline answers. The admin can turn this on to lend their own key to the
+     class. The endpoint and model travel in the clear; the key itself is
+     wrapped so it is not sitting in plain sight in the synced blob.
+     This is obfuscation, NOT secrecy: anyone who can read the page's own
+     JavaScript can derive the same wrapper. The admin panel says so before
+     the switch can be turned on. */
+  var AI_SHARE_KEY = 'aia_ai_shared';
+  var AI_SHARE_SALT = 'aia10a-sharing-v1';
+  function _shareCipher() { return (getPassFull() || '') + '|' + AI_SHARE_SALT; }
+  /* Small reversible wrapper — enough to keep the key out of casual view in
+     the synced JSON, not a security boundary. */
+  function _obfuscate(str, cipher) {
+    try {
+      var out = [], c = String(cipher || '');
+      for (var i = 0; i < str.length; i++) {
+        out.push(str.charCodeAt(i) ^ c.charCodeAt(i % c.length));
+      }
+      return btoa(out.map(function (n) { return String.fromCharCode(n & 0xff); }).join(''));
+    } catch (e) { return ''; }
+  }
+  function _unobfuscate(b64, cipher) {
+    try {
+      var raw = atob(b64), c = String(cipher || ''), out = '';
+      for (var i = 0; i < raw.length; i++) {
+        out += String.fromCharCode(raw.charCodeAt(i) ^ c.charCodeAt(i % c.length));
+      }
+      return out;
+    } catch (e) { return ''; }
+  }
+  /* The full admin passphrase, used only as the shared-key wrapper input. */
+  function getPassFull() {
+    var passes = (window.SEED && window.SEED.admin_passes) || {};
+    return passes.full || '';
+  }
+  function getAiSharedRaw() { return _get(AI_SHARE_KEY, null); }
+  /* Returns a ready-to-use config for this device, or null when sharing is
+     off / this device cannot unlock it. */
+  function getAiSharedConfig() {
+    var raw = getAiSharedRaw();
+    if (!raw || !raw.blob) return null;
+    var cipher = _shareCipher();
+    if (!cipher) return null;
+    try {
+      var packed = _unobfuscate(raw.blob, cipher);
+      var obj = JSON.parse(packed);
+      if (!obj || !obj.apiKey) return null;
+      var base = getAiConfig();
+      return {
+        apiKey: obj.apiKey,
+        baseUrl: raw.baseUrl || base.baseUrl,
+        model: raw.model || base.model,
+        temperature: (raw.temperature != null ? raw.temperature : base.temperature),
+        systemPrompt: raw.systemPrompt || base.systemPrompt,
+        mode: 'api',
+        shared: true
+      };
+    } catch (e) { return null; }
+  }
+  function aiSharingOn() { return !!(getAiSharedRaw() && getAiSharedRaw().blob); }
+  /* Called from the admin panel. `cfg` is the admin's own config. */
+  function setAiSharedConfig(cfg) {
+    var cipher = _shareCipher();
+    if (!cfg || !cfg.apiKey || !cipher) return false;
+    var inner = { apiKey: cfg.apiKey };
+    var meta = {
+      baseUrl: cfg.baseUrl || 'https://api.openai.com/v1',
+      model: cfg.model || 'gpt-4o-mini',
+      temperature: (cfg.temperature != null ? cfg.temperature : 0.7),
+      systemPrompt: cfg.systemPrompt || '',
+      at: new Date().toISOString(),
+      blob: _obfuscate(JSON.stringify(inner), cipher)
+    };
+    _set(AI_SHARE_KEY, meta);
+    return true;
+  }
+  function clearAiShared() { _set(AI_SHARE_KEY, null); }
   function setAiConfig(cfg) {
     var clean = Object.assign({}, cfg || {});
     if ('apiKey' in clean) { setAiKey(clean.apiKey); delete clean.apiKey; }
@@ -797,6 +910,8 @@ var DataStore = (function () {
     getActivityLog: getActivityLog, logActivity: logActivity, logAction: logAction,
     getPresence: getPresence, getOnlineUsers: getOnlineUsers, getUserStats: getUserStats,
     getAiConfig: getAiConfig, setAiConfig: setAiConfig,
+    getAiSharedConfig: getAiSharedConfig, setAiSharedConfig: setAiSharedConfig,
+    clearAiShared: clearAiShared, aiSharingOn: aiSharingOn,
     getAiKey: getAiKey, setAiKey: setAiKey,
     getSubjects: getSubjects,
     getSubjectContent: getSubjectContent, setSubjectContent: setSubjectContent, getSubjectContentFor: getSubjectContentFor,

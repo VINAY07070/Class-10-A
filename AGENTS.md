@@ -3,6 +3,27 @@
 Static multi-page class portal. HTML + CSS + vanilla JS. **No build step.**
 Must work when opened directly via `file://` as well as served over HTTP.
 
+## ACTIVE SCOPE — work ONLY on these four items. Nothing else, ever.
+
+The user has asked repeatedly and emphatically that work is limited to the list
+below. Do NOT refactor, optimise, restyle, or "improve" anything outside it —
+not the stickman art, not page-load speed, not the script-loader chain, not CSS,
+not unrelated pages. If you spot an unrelated bug, report it; do not fix it.
+
+1. **AI usable by all users via the admin's shared AI setup.**
+   Implemented (admin share toggle + wrapped key in `data.js`, consumed by
+   `ai.js`). NOT yet tested.
+2. **Each user's AI chat history stays private.**
+   Exclusion of `aia_ai_chat_*` from sync started; not finished or tested.
+3. **Private chat: admin → student delivery, and the missing student-side
+   section.** Admin sends, student sees nothing and no section appears.
+   Only investigated; NOT fixed.
+4. **Profile-edit section for users** (profile only, nothing else).
+   Not started.
+
+Acceptance for each is behavioural: prove it in a browser across two devices
+(or two contexts) before calling it done.
+
 ## Layout (easy to get wrong)
 
 Pages live in the repo root (`index.html`, `chat.html`, `admin.html`, …), but

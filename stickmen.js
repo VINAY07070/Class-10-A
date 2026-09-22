@@ -132,21 +132,24 @@
     s += '<line class="p-neck" x1="60" y1="78" x2="60" y2="74" stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round"/>';
     s += '<g class="p-headG">';
     s += '<circle class="p-head" cx="60" cy="60" r="' + HEAD_R + '" fill="none" stroke="' + ink + '" stroke-width="' + w + '"/>';
-    s += '<circle class="p-pupL" cx="54.5" cy="59.5" r="1.6" fill="' + ink + '"/>';
-    s += '<circle class="p-pupR" cx="65.5" cy="59.5" r="1.6" fill="' + ink + '"/>';
+    s += '<circle class="p-pupL" cx="' + (HEAD.x - 5) + '" cy="' + (HEAD.y - 0.5) + '" r="1.6" fill="' + ink + '"/>';
+    s += '<circle class="p-pupR" cx="' + (HEAD.x + 5) + '" cy="' + (HEAD.y - 0.5) + '" r="1.6" fill="' + ink + '"/>';
     /* Vinay wears sunglasses. They are a separate group so the blink logic
        can hide the lenses instead of trying to squash them (a squashed
        rectangle reads as broken art, not as a blink). Lenses sit exactly
        over the pupils at rest so the wink/blink reveals the eyes beneath. */
     if (isV) {
       s += '<g class="p-shades" opacity="1">';
-      s += '<path d="M50 57.2 H70 V59.2 A5 5 0 0 1 65 64.2 H55 A5 5 0 0 1 50 59.2 Z" fill="' + ink + '" opacity=".92"/>';
-      s += '<path d="M50 57.2 H70" stroke="' + acc + '" stroke-width="1.2" stroke-linecap="round" opacity=".95"/>';
-      s += '<path d="M53 60.5 H58" stroke="' + acc + '" stroke-width="1" stroke-linecap="round" opacity=".7"/>';
+      /* Lenses straddle the eye line and span the head, so they read as
+         sunglasses rather than a stray bar floating in the face. */
+      var shTop = HEAD.y - 2.3, shBot = HEAD.y + 3.2;
+      s += '<path d="M50 ' + shTop + ' H70 V' + (HEAD.y + 1.2) + ' A5 5 0 0 1 65 ' + shBot + ' H55 A5 5 0 0 1 50 ' + (HEAD.y + 1.2) + ' Z" fill="' + ink + '" opacity=".92"/>';
+      s += '<path d="M50 ' + shTop + ' H70" stroke="' + acc + '" stroke-width="1.2" stroke-linecap="round" opacity=".95"/>';
+      s += '<path d="M53 ' + (HEAD.y + 0.5) + ' H58" stroke="' + acc + '" stroke-width="1" stroke-linecap="round" opacity=".7"/>';
       s += '</g>';
     }
-    s += '<path class="p-mouth" d="M54 68 Q60 71.5 66 68" stroke="' + ink + '" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".85"/>';
-    s += '<ellipse class="p-mouthOpen" cx="60" cy="69.5" rx="2.4" ry="3" fill="' + ink + '" opacity="0"/>';
+    s += '<path class="p-mouth" d="M' + (HEAD.x - 5) + ' ' + (HEAD.y + 8) + ' Q' + HEAD.x + ' ' + (HEAD.y + 12.2) + ' ' + (HEAD.x + 5) + ' ' + (HEAD.y + 8) + '" stroke="' + ink + '" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".85"/>';
+    s += '<ellipse class="p-mouthOpen" cx="' + HEAD.x + '" cy="' + (HEAD.y + 9.5) + '" rx="2.4" ry="3" fill="' + ink + '" opacity="0"/>';
     s += '</g>'; /* headG */
     s += '</g></g></svg>';
     return s;
@@ -1125,9 +1128,13 @@
        cheaper than swapping art, and reads clearly at mascot size. */
     var blinkSquash = blinking ? 0.12 : 1;
     var px = F.gaze.x * 1.1, py = F.gaze.y * 1.2;
-    E.pupL.setAttribute('cx', (55 + px).toFixed(1)); E.pupL.setAttribute('cy', (45.5 + py).toFixed(1));
-    E.pupR.setAttribute('cx', (65 + px).toFixed(1)); E.pupR.setAttribute('cy', (45.5 + py).toFixed(1));
-    var lidY = (45.5 + py).toFixed(1);
+    /* The eyes sit on the horizontal midline of the head and the mouth below
+       them. These offsets are relative to the head centre, never hard-coded,
+       so adjusting HEAD.y can never again strand the face outside the head. */
+    var eyeY = HEAD.y - 0.5 + py, eyeL = HEAD.x - 5 + px, eyeR = HEAD.x + 5 + px;
+    E.pupL.setAttribute('cx', eyeL.toFixed(1)); E.pupL.setAttribute('cy', eyeY.toFixed(1));
+    E.pupR.setAttribute('cx', eyeR.toFixed(1)); E.pupR.setAttribute('cy', eyeY.toFixed(1));
+    var lidY = eyeY.toFixed(1);
     var lid = blinking ? 'translate(0 ' + lidY + ') scale(1 ' + blinkSquash + ') translate(0 -' + lidY + ')' : null;
     if (lid) { E.pupL.setAttribute('transform', lid); E.pupR.setAttribute('transform', lid); }
     else { E.pupL.removeAttribute('transform'); E.pupR.removeAttribute('transform'); }
@@ -1141,10 +1148,12 @@
     }
     /* mouth: smile <-> frown morph + open (surprise/yawn) */
     var sm = clamp(F.smile, -1, 1);
-    E.mouth.setAttribute('d', 'M55 53 Q60 ' + (53 + sm * 4.2).toFixed(1) + ' 65 53');
+    var mouthY = HEAD.y + 8 + F.gaze.y * 2;
+    E.mouth.setAttribute('d', 'M' + (HEAD.x - 5) + ' ' + mouthY.toFixed(1) +
+      ' Q' + HEAD.x + ' ' + (mouthY + sm * 4.2).toFixed(1) + ' ' + (HEAD.x + 5) + ' ' + mouthY.toFixed(1));
     E.mouth.setAttribute('opacity', (0.9 * (1 - F.mouthOpen)).toFixed(2));
     E.mouthOpen.setAttribute('opacity', (F.mouthOpen * 0.95).toFixed(2));
-    E.mouthOpen.setAttribute('cy', (54.5).toFixed(1));
+    E.mouthOpen.setAttribute('cy', (mouthY + 1.5).toFixed(1));
     E.mouthOpen.setAttribute('ry', (1.4 + F.mouthOpen * 2.4).toFixed(2));
 
     /* squash & stretch around feet */

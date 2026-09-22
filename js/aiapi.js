@@ -92,7 +92,10 @@ window.AiaApi = (function () {
     return h;
   }
 
-  /* Guards the key. A base URL that arrives over sync is not approval. */
+  /* Guards the key. A base URL that arrives over sync is not approval, and
+     that applies to a shared key too: only the well-known providers are
+     accepted there, so tampering with the synced blob cannot redirect a
+     shared key to a stranger's server. */
   function assertHostAllowed(url) {
     var h = hostOf(url);
     if (!h) throw new Error('That Base URL is not a valid address.');
@@ -219,6 +222,8 @@ window.AiaApi = (function () {
     endpointFor: endpointFor,
     friendlyError: friendlyError,
     approveKeyHost: approveKeyHost,
+    /* Exposed so the admin panel can refuse to share to an odd endpoint. */
+    isKnownGoodHost: isKnownGoodHost,
     isKnownGoodHost: isKnownGoodHost,
     chat: chat
   };

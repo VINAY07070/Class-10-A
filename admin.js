@@ -601,7 +601,19 @@
     /* Remember which host this device agreed to, so a base URL that changes
        later over sync cannot redirect the key elsewhere. */
     if (cfg.apiKey && baseUrl) AiaApi.approveKeyHost(baseUrl);
-    App.showToast('AI config saved 🤖', 'success');
+    /* Opt-in sharing. Only ever publishes a key the admin actually entered
+       here, and never the key in the clear. */
+    var shareEl = document.getElementById('aiShareToggle');
+    if (shareEl && shareEl.checked) {
+      if (!cfg.apiKey) {
+        App.showToast('Add your API key first, then share it', 'warning');
+      } else if (DataStore.setAiSharedConfig(cfg)) {
+        App.showToast('AI config saved and shared with the class 🤖', 'success');
+      }
+    } else {
+      DataStore.clearAiShared();
+      App.showToast('AI config saved 🤖', 'success');
+    }
   }
 
   /* Provider picker: fills in the base URL and a default model. */
@@ -752,6 +764,8 @@
     if (presetSel) presetSel.addEventListener('change', applyAiPreset);
     var testBtn = document.getElementById('testAiBtn');
     if (testBtn) testBtn.addEventListener('click', testAi);
+    var shareToggle = document.getElementById('aiShareToggle');
+    if (shareToggle) shareToggle.checked = !!DataStore.aiSharingOn();
 
     var exportBtn = document.getElementById('exportBtn');
     if (exportBtn) exportBtn.addEventListener('click', exportData);

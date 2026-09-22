@@ -219,8 +219,15 @@
 
   /* ============ API engine ============ */
   function apiAnswer(raw, done) {
-    if (!config || !config.apiKey) { done(localAnswer(raw)); return; }
-    AiaApi.chat(config, raw, config.systemPrompt)
+    /* A student with no key of their own can still reach the class AI when
+       the admin has chosen to share it. */
+    var cfg = config;
+    if (!cfg || !cfg.apiKey) {
+      var shared = DataStore.getAiSharedConfig ? DataStore.getAiSharedConfig() : null;
+      if (shared) cfg = shared;
+    }
+    if (!cfg || !cfg.apiKey) { done(localAnswer(raw)); return; }
+    AiaApi.chat(cfg, raw, cfg.systemPrompt)
       .then(function (text) { done(text); })
       .catch(function (err) {
         done('\u26a0\ufe0f **API brain error:** ' + err.message +
@@ -362,6 +369,10 @@
 
   /* ============ boot ============ */
   config = DataStore.getAiConfig();
+  /* The shared config can land after this page loaded, so re-read it when
+     the relay reports a change. */
+  function refreshConfig() { try { config = DataStore.getAiConfig(); } catch (e) {} }
+  document.addEventListener('aia-sync-applied', refreshConfig);
   setMode(mode);
   renderHistory();
 })();
