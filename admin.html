@@ -83,6 +83,7 @@
           <button class="admin-tab" data-tab="private"><i class="fa-solid fa-user-shield"></i> Private Chat</button>
           <button class="admin-tab" data-tab="blocks"><i class="fa-solid fa-ban"></i> Block Users</button>
           <button class="admin-tab" data-tab="activity"><i class="fa-solid fa-activity"></i> Activity</button>
+          <button class="admin-tab" data-tab="visits"><i class="fa-solid fa-clock-rotate-left"></i> Last Visits</button>
           <button class="admin-tab" data-tab="users"><i class="fa-solid fa-users"></i> Users</button>
           <button class="admin-tab" data-tab="theme"><i class="fa-solid fa-palette"></i> Theme</button>
           <button class="admin-tab" data-tab="settings"><i class="fa-solid fa-screwdriver-wrench"></i> Settings</button>
@@ -331,6 +332,33 @@
           </div>
         </div>
 
+        <!-- LAST VISITS -->
+        <div class="admin-panel" id="panel-visits">
+          <div class="admin-form">
+            <h3 class="heading-sm">Last Visits</h3>
+            <p class="text-secondary" style="font-size:0.88rem;margin:8px 0 12px">
+              When each classmate last opened the site, and where they went. Sorted by most recent first.
+            </p>
+            <div id="visitsSummary" class="visits-summary"></div>
+            <div class="cred-actions" style="margin-bottom:12px">
+              <button class="btn btn-secondary btn-sm" id="visitsCsvBtn"><i class="fa-solid fa-download"></i> Download CSV</button>
+              <button class="btn btn-secondary btn-sm" id="visitsCopyBtn"><i class="fa-solid fa-copy"></i> Copy list</button>
+            </div>
+            <div class="visits-filters" id="visitsFilters">
+              <button class="btn btn-secondary btn-sm visits-filter active" data-filter="all">All</button>
+              <button class="btn btn-secondary btn-sm visits-filter" data-filter="online">Online now</button>
+              <button class="btn btn-secondary btn-sm visits-filter" data-filter="today">Today</button>
+              <button class="btn btn-secondary btn-sm visits-filter" data-filter="week">This week</button>
+              <button class="btn btn-secondary btn-sm visits-filter" data-filter="never">Never visited</button>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+              <label>Search</label>
+              <input type="search" id="visitsSearch" placeholder="Search a name or username…" autocomplete="off">
+            </div>
+            <div id="visitsTable" class="user-stats-table"></div>
+          </div>
+        </div>
+
         <!-- USERS -->
         <div class="admin-panel" id="panel-users">
           <div class="admin-form">
@@ -345,10 +373,6 @@
             </div>
             <div id="credGenResult" class="text-muted" style="font-size:0.82rem;margin:8px 0 0"></div>
             <div id="credTable" class="user-stats-table" style="margin-top:14px"></div>
-          </div>
-          <div class="admin-form" style="margin-top:22px">
-            <h3 class="heading-sm">User Stats &amp; Activity</h3>
-            <div id="userStatsTable" class="user-stats-table"></div>
           </div>
         </div>
 

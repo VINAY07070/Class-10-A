@@ -187,6 +187,174 @@
       : '<div class="text-muted" style="text-align:center;padding:20px">No activity yet — students will show up here as they visit pages.</div>';
   }
 
+  /* ---------- last visits ---------- */
+  var visitsFilter = 'all';
+  var visitsQuery = '';
+  var ONLINE_MS = 120000;
+
+  function visitBucket(r) {
+    if (!r.lastSeen) return 'never';
+    var d = new Date(r.at || r.lastSeen);
+    var now = new Date();
+    if (Date.now() - r.lastSeen < ONLINE_MS) return 'online';
+    if (d.toDateString() === now.toDateString()) return 'today';
+    if (Date.now() - r.lastSeen < 7 * 86400000) return 'week';
+    return 'older';
+  }
+  function visitStatus(r) {
+    var b = visitBucket(r);
+    var meta = {
+      online: ['visit-online', 'Online now'],
+      today: ['visit-today', 'Today'],
+      week: ['visit-week', 'This week'],
+      older: ['visit-older', 'Earlier'],
+      never: ['visit-never', 'Never visited']
+    }[b];
+    return '<span class="visit-badge ' + meta[0] + '"><i class="fa-solid fa-circle"></i> ' + meta[1] + '</span>';
+  }
+
+  function renderVisits() {
+    var tableEl = document.getElementById('visitsTable');
+    var sumEl = document.getElementById('visitsSummary');
+    if (!tableEl || !sumEl || !DataStore.isAdminAuthed()) return;
+    if (!DataStore.getLastVisits) return;
+
+    var all = DataStore.getLastVisits();
+    var online = all.filter(function (r) { return visitBucket(r) === 'online'; }).length;
+    var today = all.filter(function (r) { return visitBucket(r) === 'today'; }).length;
+    var never = all.filter(function (r) { return visitBucket(r) === 'never'; }).length;
+    var activeToday = online + today;
+    var totalVisits = all.reduce(function (n, r) { return n + (r.visits || 0); }, 0);
+
+    sumEl.innerHTML =
+      '<div class="visit-stat"><span class="visit-stat-value">' + all.length + '</span><span class="visit-stat-label">On the roster</span></div>' +
+      '<div class="visit-stat"><span class="visit-stat-value">' + online + '</span><span class="visit-stat-label">Online now</span></div>' +
+      '<div class="visit-stat"><span class="visit-stat-value">' + activeToday + '</span><span class="visit-stat-label">Seen today</span></div>' +
+      '<div class="visit-stat"><span class="visit-stat-value">' + totalVisits + '</span><span class="visit-stat-label">Total page views</span></div>' +
+      '<div class="visit-stat"><span class="visit-stat-value">' + never + '</span><span class="visit-stat-label">Never visited</span></div>';
+
+    var rows = all;
+    if (visitsFilter !== 'all') {
+      rows = rows.filter(function (r) {
+        if (visitsFilter === 'online') return visitBucket(r) === 'online';
+        if (visitsFilter === 'today') { var b = visitBucket(r); return b === 'online' || b === 'today'; }
+        if (visitsFilter === 'week') return !!r.lastSeen && Date.now() - r.lastSeen < 7 * 86400000;
+        if (visitsFilter === 'never') return visitBucket(r) === 'never';
+        return true;
+      });
+    }
+    if (visitsQuery) {
+      var q = visitsQuery.toLowerCase();
+      rows = rows.filter(function (r) {
+        return String(r.name).toLowerCase().indexOf(q) > -1 ||
+          String(r.username).toLowerCase().indexOf(q) > -1;
+      });
+    }
+
+    if (!rows.length) {
+      tableEl.innerHTML = '<div class="text-muted" style="text-align:center;padding:20px">No one matches this filter.</div>';
+      return;
+    }
+
+    var body = rows.map(function (r) {
+      var where = r.page ? prettyPage(r.page) : '';
+      var doing = r.action && r.action !== 'visit'
+        ? ((ACTION_META[r.action] || { label: r.action }).label)
+        : '';
+      var pages = Object.keys(r.pages || {}).sort().map(function (p) {
+        return prettyPage(p) + ' ×' + r.pages[p];
+      }).join(', ');
+      var acts = Object.keys(r.actions || {}).filter(function (a) { return a !== 'visit'; })
+        .map(function (a) { return (ACTION_META[a] || { label: a }).label + ' ×' + r.actions[a]; }).join(', ');
+      var trail = (r.recent || []).slice(0, 4).map(function (x) {
+        return '<li><i class="fa-solid ' + actionIcon(x) + '"></i> ' +
+          App.escapeHtml(x.detail || ((ACTION_META[x.action] || ACTION_META.visit).label + (x.page ? ' ' + prettyPage(x.page) : ''))) +
+          ' <span class="text-muted">· ' + App.timeAgo(x.at) + '</span></li>';
+      }).join('');
+      return '<tr>' +
+        '<td><strong>' + App.escapeHtml(r.name) + '</strong>' +
+          (isAdminUser(r.username, r.name) ? ' <span class="admin-chip">ADMIN</span>' : '') +
+          '<div class="text-muted" style="font-size:.75rem">@' + App.escapeHtml(r.username) + '</div>' +
+          (trail ? '<ul class="user-trail">' + trail + '</ul>' : '') + '</td>' +
+        '<td>' + visitStatus(r) + '</td>' +
+        '<td>' + (r.lastSeen ? App.timeAgo(r.at || r.lastSeen) : '<span class="text-muted">—</span>') +
+          (r.lastSeen ? '<div class="text-muted" style="font-size:.72rem">' +
+            App.escapeHtml(new Date(r.at || r.lastSeen).toLocaleString()) + '</div>' : '') + '</td>' +
+        '<td>' + (where ? App.escapeHtml(where) : '<span class="text-muted">—</span>') +
+          (doing ? '<div class="text-muted" style="font-size:.72rem">' + App.escapeHtml(doing) + '</div>' : '') + '</td>' +
+        '<td>' + (r.visits || 0) + '</td>' +
+        '<td class="user-pages">' + App.escapeHtml(pages || '—') + '</td>' +
+        '<td>' + (acts ? App.escapeHtml(acts) : '—') + '</td>' +
+        '<td>' + (r.chats || 0) + '</td>' +
+        '<td>' + (r.ai || 0) + '</td>' +
+        '</tr>';
+    }).join('');
+
+    tableEl.innerHTML = '<table class="admin-table visits-table"><thead><tr>' +
+      '<th>Student</th><th>Status</th><th>Last seen</th><th>Where</th>' +
+      '<th>Visits</th><th>Pages</th><th>Actions</th><th>Chat</th><th>AI</th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table>';
+  }
+
+  /* Bind the filter chips and search once; re-rendering the table must not
+     re-bind, or every live refresh would stack duplicate listeners. */
+  function bindVisitsControls() {
+    var wrap = document.getElementById('visitsFilters');
+    if (!wrap || wrap.getAttribute('data-bound') === '1') return;
+    wrap.setAttribute('data-bound', '1');
+    wrap.querySelectorAll('.visits-filter').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        visitsFilter = btn.getAttribute('data-filter') || 'all';
+        wrap.querySelectorAll('.visits-filter').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        renderVisits();
+      });
+    });
+    var search = document.getElementById('visitsSearch');
+    if (search) {
+      search.addEventListener('input', function () {
+        visitsQuery = search.value.trim();
+        renderVisits();
+      });
+    }
+    var csv = document.getElementById('visitsCsvBtn');
+    if (csv) csv.addEventListener('click', function () {
+      var blob = new Blob([visitsCsv()], { type: 'text/csv' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'class-10a-last-visits.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      App.showToast('Downloaded last-visits CSV', 'success');
+    });
+    var cp = document.getElementById('visitsCopyBtn');
+    if (cp) cp.addEventListener('click', function () {
+      var text = visitsCsv();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { App.showToast('Visit list copied', 'success'); })
+          .catch(function () { App.showToast('Copy blocked by the browser', 'error'); });
+      } else App.showToast('Copy not supported here', 'error');
+    });
+  }
+
+  function visitsCsv() {
+    var esc = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    var head = ['Student', 'Username', 'Status', 'Last seen', 'Where', 'Visits', 'Pages', 'Actions', 'Chat', 'AI'];
+    var lines = [head.map(esc).join(',')];
+    (DataStore.getLastVisits ? DataStore.getLastVisits() : []).forEach(function (r) {
+      var pages = Object.keys(r.pages || {}).map(function (p) { return prettyPage(p) + ' x' + r.pages[p]; }).join('; ');
+      var acts = Object.keys(r.actions || {}).filter(function (a) { return a !== 'visit'; })
+        .map(function (a) { return (ACTION_META[a] || { label: a }).label + ' x' + r.actions[a]; }).join('; ');
+      lines.push([
+        r.name, r.username,
+        { online: 'Online now', today: 'Today', week: 'This week', older: 'Earlier', never: 'Never visited' }[visitBucket(r)],
+        r.lastSeen ? new Date(r.at || r.lastSeen).toLocaleString() : 'Never',
+        r.page ? prettyPage(r.page) : '', r.visits || 0, pages, acts, r.chats || 0, r.ai || 0
+      ].map(esc).join(','));
+    });
+    return lines.join('\n');
+  }
+
   /* ---------- student credentials ---------- */
   function credRows() {
     var creds = DataStore.getEffectiveCredentials().slice();
@@ -228,9 +396,20 @@
             (isAdminUser(c.username, c.name) ? ' <span class="admin-chip">ADMIN</span>' : '') + '</td>' +
           '<td><code>' + App.escapeHtml(c.username) + '</code></td>' +
           '<td><code>' + App.escapeHtml(c.password) + '</code></td>' +
-          '<td><button class="btn btn-secondary btn-sm copy-cred" data-user="' + App.escapeHtml(c.username) + '" title="Copy"><i class="fa-solid fa-copy"></i></button></td></tr>';
+          '<td><button class="btn btn-secondary btn-sm copy-cred" data-user="' + App.escapeHtml(c.username) + '" title="Copy"><i class="fa-solid fa-copy"></i></button>' +
+          '<button class="btn btn-secondary btn-sm reset-pw" data-user="' + App.escapeHtml(c.username) + '" style="margin-left:4px" title="Reset password"><i class="fa-solid fa-arrows-rotate"></i></button></td></tr>';
       }).join('') + '</tbody></table>';
     bindCopy(el);
+    el.querySelectorAll('.reset-pw').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var u = btn.getAttribute('data-user');
+        var newPw = randomPw(6);
+        if (DataStore.resetPassword(u, newPw)) {
+          App.showToast('Password reset → ' + newPw, 'success');
+          renderCreds();
+        }
+      });
+    });
   }
   function bindCopy(scope) {
     scope.querySelectorAll('.copy-cred').forEach(function (btn) {
@@ -280,72 +459,6 @@
       App.showToast('Downloaded logins CSV', 'success');
     });
     renderCreds();
-  }
-
-  /* ---------- user stats ---------- */
-  function renderUserStats() {
-    var el = document.getElementById('userStatsTable');
-    if (!el) return;
-    var stats = DataStore.getUserStats();
-    var creds = DataStore.getEffectiveCredentials();
-    var names = stats ? Object.keys(stats) : [];
-
-    if (!names.length) {
-      el.innerHTML = '<div class="text-muted" style="text-align:center;padding:20px">No visit data yet. Ask classmates to open the site!</div>';
-      return;
-    }
-
-    var rows = names.sort().map(function (u) {
-      var s = stats[u];
-      var pages = Object.keys(s.pages).sort().map(function (p) { return p + '×' + s.pages[p]; }).join(', ');
-      var cred = creds.find(function (c) { return c.username.toLowerCase() === u.toLowerCase(); });
-      var pw = cred ? cred.password : '—';
-      var acts = Object.keys(s.actions).filter(function (a) { return a !== 'visit'; })
-        .map(function (a) { return (ACTION_META[a] || { label: a }).label + '×' + s.actions[a]; }).join(', ');
-      /* newest first: what this student is doing right now */
-      var trail = (s.recent || []).slice(0, 5).map(function (r) {
-        return '<li><i class="fa-solid ' + actionIcon(r) + '"></i> ' +
-          App.escapeHtml(r.detail || ((ACTION_META[r.action] || ACTION_META.visit).label + (r.page ? ' ' + prettyPage(r.page) : ''))) +
-          ' <span class="text-muted">· ' + App.timeAgo(r.at) + '</span></li>';
-      }).join('');
-      return '<tr>' +
-        '<td><strong>' + App.escapeHtml(s.name) + '</strong>' +
-          (isAdminUser(u, s.name) ? ' <span class="admin-chip">ADMIN</span>' : '') +
-          '<div class="text-muted" style="font-size:.75rem">@' + App.escapeHtml(u) + '</div>' +
-          (trail ? '<ul class="user-trail">' + trail + '</ul>' : '') + '</td>' +
-        '<td>' + s.pageCount + '<div class="text-muted" style="font-size:.72rem">' + (s.chats || 0) + ' chat · ' + (s.ai || 0) + ' AI</div></td>' +
-        '<td class="user-pages">' + App.escapeHtml(pages || '—') + '</td>' +
-        '<td>' + (acts ? App.escapeHtml(acts) : '—') + '</td>' +
-        '<td>' + App.timeAgo(s.lastSeen) + '</td>' +
-        '<td><code style="font-size:.75rem">' + App.escapeHtml(pw) + '</code>' +
-        '<button class="btn btn-secondary btn-sm reset-pw" data-user="' + App.escapeHtml(u) + '" style="margin-left:6px" title="Reset password"><i class="fa-solid fa-arrows-rotate"></i></button>' +
-        '<button class="btn btn-secondary btn-sm copy-cred" data-user="' + App.escapeHtml(u) + '" style="margin-left:4px" title="Copy username &amp; password"><i class="fa-solid fa-copy"></i></button></td></tr>';
-    }).join('');
-
-    el.innerHTML = '<table class="admin-table"><thead><tr><th>Student</th><th>Visits</th><th>Pages</th><th>Actions</th><th>Last seen</th><th>Password</th></tr></thead><tbody>' + rows + '</tbody></table>';
-
-    el.querySelectorAll('.reset-pw').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var u = btn.getAttribute('data-user');
-        var newPw = randomPw(6);
-        if (DataStore.resetPassword(u, newPw)) {
-          App.showToast('Password reset → ' + newPw, 'success');
-          renderUserStats();
-        }
-      });
-    });
-    el.querySelectorAll('.copy-cred').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var u = btn.getAttribute('data-user');
-        var c = creds.find(function (x) { return x.username.toLowerCase() === u.toLowerCase(); });
-        if (!c) return;
-        var text = 'Username: ' + c.username + '\nPassword: ' + c.password;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(function () { App.showToast('Credentials copied', 'success'); })
-            .catch(function () { App.showToast(text, 'info'); });
-        } else App.showToast(text, 'info');
-      });
-    });
   }
 
   function randomPw(n) {
@@ -672,7 +785,7 @@
         App.showToast('Data imported ✅', 'success');
         loadDashboard();
         renderActivity();
-        renderUserStats();
+        renderVisits();
         renderSubjectsAdmin();
         loadAiConfig();
       } catch (e) {
@@ -689,6 +802,7 @@
       if (!DataStore.isAdminAuthed()) return;
       loadDashboard();
       renderActivity();
+      renderVisits();
     }, 8000);
   }
 
@@ -780,7 +894,7 @@
       if (!confirm('Reset EVERYTHING back to seed data? This cannot be undone.')) return;
       DataStore.resetToSeed(false);
       loadSubjectFields(); renderSubjectsAdmin(); loadAiConfig();
-      loadDashboard(); renderActivity(); renderUserStats(); renderCreds();
+      loadDashboard(); renderActivity(); renderVisits(); renderCreds();
       App.showToast('All data reset to seed 🔄', 'success');
     });
 
@@ -1155,7 +1269,7 @@
     if (!DataStore.isAdminAuthed()) return;
     clearTimeout(syncT);
     syncT = setTimeout(function () {
-      loadDashboard(); renderActivity(); renderUserStats(); renderCreds();
+      loadDashboard(); renderActivity(); renderVisits(); renderCreds();
       renderHw(); renderScores(); renderAnn(); renderPolls();
     }, 400);
   };
@@ -1178,7 +1292,8 @@
     safe('ai', loadAiConfig);
     safe('dashboard', loadDashboard);
     safe('activity', renderActivity);
-    safe('users', renderUserStats);
+    safe('last-visits', renderVisits);
+    safe('last-visits-controls', bindVisitsControls);
     safe('credentials', initCreds);
     safe('theme', renderThemePicker);
     /* new admin sections */

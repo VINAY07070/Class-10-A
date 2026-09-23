@@ -695,6 +695,83 @@ var DataStore = (function () {
     return s;
   }
   function getPresence() { return _get(KEYS.presence, {}); }
+
+  /* One row per person for the "Last Visits" admin section: everyone on the
+     roster, plus any visitor who left a trail. `lastSeen` is 0 when the
+     student has never opened the site, so the admin can see who is missing. */
+  function getLastVisits() {
+    var presence = getPresence();
+    var stats = getUserStats();
+    function nameKey(n) { return String(n || '').trim().toUpperCase(); }
+
+    var byName = {};   /* nameKey -> row */
+    function blank(name, username) {
+      return {
+        name: name, username: username || '',
+        lastSeen: 0, at: '', page: '', action: '',
+        visits: 0, pages: {}, actions: {}, recent: [],
+        chats: 0, ai: 0
+      };
+    }
+    function attachStats(row, st) {
+      if (!st) return;
+      row.visits = st.pageCount || 0;
+      row.pages = st.pages || {};
+      row.actions = st.actions || {};
+      row.recent = st.recent || [];
+      row.chats = st.chats || 0;
+      row.ai = st.ai || 0;
+    }
+
+    /* 1. everyone on the roster */
+    getStudents().forEach(function (n) {
+      if (!n) return;
+      byName[nameKey(n)] = blank(n);
+    });
+    /* 2. every account that has a login (covers admin + off-roster users) */
+    getEffectiveCredentials().forEach(function (c) {
+      if (!c || !c.name) return;
+      var k = nameKey(c.name);
+      if (!byName[k]) byName[k] = blank(c.name, c.username);
+      else if (!byName[k].username) byName[k].username = c.username;
+    });
+    var byUser = {};
+    Object.keys(byName).forEach(function (k) {
+      byUser[String(byName[k].username).toLowerCase()] = byName[k];
+    });
+
+    /* 3. overlay the live presence trail, matched by NAME first so a
+       generated username (AAY941) never splits one student into two rows */
+    Object.keys(presence).forEach(function (u) {
+      var p = presence[u] || {};
+      var row = (p.name && byName[nameKey(p.name)]) || byUser[String(u).toLowerCase()];
+      if (!row) {
+        row = blank(p.name || u, u);
+        byName[nameKey(row.name)] = row;
+      }
+      row.username = p.username || u;
+      if (p.name) row.name = p.name;
+      row.lastSeen = p.lastSeen || 0;
+      row.at = p.at || '';
+      row.page = p.page || '';
+      row.action = p.action || '';
+    });
+
+    /* 4. fold in per-user activity stats, again by name */
+    Object.keys(stats).forEach(function (u) {
+      var st = stats[u] || {};
+      var row = (st.name && byName[nameKey(st.name)]) || byUser[String(u).toLowerCase()];
+      if (!row) { row = blank(st.name || u, u); byName[nameKey(row.name)] = row; }
+      attachStats(row, st);
+      if (st.lastSeen && !row.at) row.at = st.lastSeen;
+      if (!row.username) row.username = u;
+    });
+
+    return Object.keys(byName).map(function (k) { return byName[k]; }).sort(function (a, b) {
+      if (b.lastSeen !== a.lastSeen) return b.lastSeen - a.lastSeen;
+      return String(a.name).localeCompare(String(b.name));
+    });
+  }
   function getOnlineUsers(maxAgeMs) {
     maxAgeMs = maxAgeMs || 120000;
     var now = Date.now();
@@ -1024,6 +1101,7 @@ var DataStore = (function () {
     getAiLog: getAiLog, clearAiLog: clearAiLog,
     getActivityLog: getActivityLog, logActivity: logActivity, logAction: logAction,
     getPresence: getPresence, getOnlineUsers: getOnlineUsers, getUserStats: getUserStats,
+    getLastVisits: getLastVisits,
     getAiConfig: getAiConfig, setAiConfig: setAiConfig,
     getAiSharedConfig: getAiSharedConfig, setAiSharedConfig: setAiSharedConfig,
     clearAiShared: clearAiShared, aiSharingOn: aiSharingOn,

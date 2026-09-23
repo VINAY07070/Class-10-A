@@ -3486,3 +3486,26 @@ html.perf-quiet .sm-tag,
 html.perf-quiet .sm-bubble {
   background-color: var(--glass-opaque, #0d1428);
 }
+
+/* ---- Last Visits (admin section) ---- */
+.visits-summary { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.visit-stat {
+  flex: 1 1 120px; display: flex; flex-direction: column; gap: 2px;
+  background: rgba(255,255,255,.03); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 15px;
+}
+.visit-stat-value { font-size: 1.35rem; font-weight: 800; color: var(--gold); line-height: 1.1; }
+.visit-stat-label { font-size: .74rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.visits-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.visits-filter.active { background: var(--grad-gold); color: #231303; border-color: transparent; font-weight: 800; }
+.visit-badge {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  font-size: .74rem; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+}
+.visit-badge i { font-size: .5rem; }
+.visit-online { background: rgba(52,211,153,.12); border: 1px solid rgba(52,211,153,.4); color: #7ff0c4; }
+.visit-online i { color: #34d399; }
+.visit-today { background: rgba(96,165,250,.12); border: 1px solid rgba(96,165,250,.38); color: #a8cffb; }
+.visit-week { background: rgba(245,181,68,.12); border: 1px solid rgba(245,181,68,.35); color: var(--gold-2); }
+.visit-older { background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--text-muted); }
+.visit-never { background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.35); color: #fca5a5; }
