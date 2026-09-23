@@ -70,24 +70,16 @@
   /* ---------------- geometry / world ---------------- */
   var GY = 158, CX = 60;                 // ground Y / center X in SVG units
   /* Classic stick-figure proportions, all in one place. Ground 158, hip 112,
-     spine top 78, shoulders 84. A classic stick figure is roughly six heads
-     tall with a small, plain head, so the head is r=9 centred at 57, giving
-     a head depth of 18 units on a 112-unit body — a ~6.2 head figure.
-     An oversized head with big eyes and a smile is the standard shorthand
-     for a cute character, which is exactly what made the old r=14 head read
-     as a "she stickman". Keeping the head small and the face minimal is what
-     reads as a plain stickman. */
-  var HIP = { x: 60, y: 112 }, CHEST = { x: 60, y: 78 }, HEAD = { x: 60, y: 57 }, HEAD_R = 9;
+     spine top 78, shoulders 84, head centre 60 with r=14. So the head's
+     bottom edge lands at 74, only 4 units above the spine top. That short
+     neck is what makes it read as a stickman. The old geometry put the head
+     centre at 50 and drew an 18.5-unit neck, over half the 34-unit torso,
+     which made the figure look like a lollipop rather than a stick figure. */
+  var HIP = { x: 60, y: 112 }, CHEST = { x: 60, y: 78 }, HEAD = { x: 60, y: 60 }, HEAD_R = 14;
   var SH = { x: 60, y: 84 };               // shoulder point
   var HAND_L = { x: 43, y: 110 }, HAND_R = { x: 77, y: 110 };
   var FOOT_L = { x: 51, y: GY }, FOOT_R = { x: 69, y: GY };
   var L_UPPER = 24, L_LOWER = 24, A_UPPER = 16, A_LOWER = 17;
-  /* Face geometry, derived from HEAD_R so the features can never overflow a
-     resized head. At r=9 the eyes are small dots and the mouth a short curve,
-     which is what reads as a plain stickman rather than a cartoon face. */
-  var EYE_DX = 3.4, PUP_R = 1.2;
-  var MOUTH_W = 3.6, MOUTH_DY = 5.2, MOUTH_CURVE = 3.2, MOUTH_OPEN_RX = 1.7;
-  var SHADE_L = HEAD.x - 7.6, SHADE_R = HEAD.x + 7.6;
 
   var stage = null, toggleBtn = null, rafId = 0, lastT = 0, hidden = false;
   var figures = {};
@@ -137,11 +129,11 @@
     /* head — a plain circle. No hair ribbon, no headband, no glasses:
        those details read as a character with a hairstyle rather than a
        universal "stickman", which is what the class asked us to fix. */
-    s += '<line class="p-neck" x1="60" y1="78" x2="60" y2="' + (HEAD.y + HEAD_R) + '" stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round"/>';
+    s += '<line class="p-neck" x1="60" y1="78" x2="60" y2="74" stroke="' + ink + '" stroke-width="' + w + '" stroke-linecap="round"/>';
     s += '<g class="p-headG">';
-    s += '<circle class="p-head" cx="' + HEAD.x + '" cy="' + HEAD.y + '" r="' + HEAD_R + '" fill="none" stroke="' + ink + '" stroke-width="' + w + '"/>';
-    s += '<circle class="p-pupL" cx="' + (HEAD.x - EYE_DX) + '" cy="' + (HEAD.y - 0.5) + '" r="' + PUP_R + '" fill="' + ink + '"/>';
-    s += '<circle class="p-pupR" cx="' + (HEAD.x + EYE_DX) + '" cy="' + (HEAD.y - 0.5) + '" r="' + PUP_R + '" fill="' + ink + '"/>';
+    s += '<circle class="p-head" cx="60" cy="60" r="' + HEAD_R + '" fill="none" stroke="' + ink + '" stroke-width="' + w + '"/>';
+    s += '<circle class="p-pupL" cx="' + (HEAD.x - 5) + '" cy="' + (HEAD.y - 0.5) + '" r="1.6" fill="' + ink + '"/>';
+    s += '<circle class="p-pupR" cx="' + (HEAD.x + 5) + '" cy="' + (HEAD.y - 0.5) + '" r="1.6" fill="' + ink + '"/>';
     /* Vinay wears sunglasses. They are a separate group so the blink logic
        can hide the lenses instead of trying to squash them (a squashed
        rectangle reads as broken art, not as a blink). Lenses sit exactly
@@ -150,14 +142,14 @@
       s += '<g class="p-shades" opacity="1">';
       /* Lenses straddle the eye line and span the head, so they read as
          sunglasses rather than a stray bar floating in the face. */
-      var shTop = HEAD.y - 1.6, shBot = HEAD.y + 2.4;
-      s += '<path d="M' + SHADE_L + ' ' + shTop + ' H' + SHADE_R + ' V' + (HEAD.y + 0.8) + ' A3.4 3.4 0 0 1 ' + (SHADE_R - 3.4) + ' ' + shBot + ' H' + (SHADE_L + 3.4) + ' A3.4 3.4 0 0 1 ' + SHADE_L + ' ' + (HEAD.y + 0.8) + ' Z" fill="' + ink + '" opacity=".92"/>';
-      s += '<path d="M' + SHADE_L + ' ' + shTop + ' H' + SHADE_R + '" stroke="' + acc + '" stroke-width="1" stroke-linecap="round" opacity=".95"/>';
-      s += '<path d="M' + (SHADE_L + 1.6) + ' ' + (HEAD.y + 0.4) + ' H' + (HEAD.x - 1.5) + '" stroke="' + acc + '" stroke-width=".8" stroke-linecap="round" opacity=".7"/>';
+      var shTop = HEAD.y - 2.3, shBot = HEAD.y + 3.2;
+      s += '<path d="M50 ' + shTop + ' H70 V' + (HEAD.y + 1.2) + ' A5 5 0 0 1 65 ' + shBot + ' H55 A5 5 0 0 1 50 ' + (HEAD.y + 1.2) + ' Z" fill="' + ink + '" opacity=".92"/>';
+      s += '<path d="M50 ' + shTop + ' H70" stroke="' + acc + '" stroke-width="1.2" stroke-linecap="round" opacity=".95"/>';
+      s += '<path d="M53 ' + (HEAD.y + 0.5) + ' H58" stroke="' + acc + '" stroke-width="1" stroke-linecap="round" opacity=".7"/>';
       s += '</g>';
     }
-    s += '<path class="p-mouth" d="M' + (HEAD.x - MOUTH_W) + ' ' + (HEAD.y + MOUTH_DY) + ' Q' + HEAD.x + ' ' + (HEAD.y + MOUTH_DY + MOUTH_CURVE) + ' ' + (HEAD.x + MOUTH_W) + ' ' + (HEAD.y + MOUTH_DY) + '" stroke="' + ink + '" stroke-width="1.2" fill="none" stroke-linecap="round" opacity=".7"/>';
-    s += '<ellipse class="p-mouthOpen" cx="' + HEAD.x + '" cy="' + (HEAD.y + MOUTH_DY + 1.2) + '" rx="' + MOUTH_OPEN_RX + '" ry="2" fill="' + ink + '" opacity="0"/>';
+    s += '<path class="p-mouth" d="M' + (HEAD.x - 5) + ' ' + (HEAD.y + 8) + ' Q' + HEAD.x + ' ' + (HEAD.y + 12.2) + ' ' + (HEAD.x + 5) + ' ' + (HEAD.y + 8) + '" stroke="' + ink + '" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".85"/>';
+    s += '<ellipse class="p-mouthOpen" cx="' + HEAD.x + '" cy="' + (HEAD.y + 9.5) + '" rx="2.4" ry="3" fill="' + ink + '" opacity="0"/>';
     s += '</g>'; /* headG */
     s += '</g></g></svg>';
     return s;
@@ -1122,7 +1114,7 @@
 
     /* head group: position + tilt */
     var tiltDeg = (F.headTilt * 57.3).toFixed(1);
-    E.headG.setAttribute('transform', 'translate(' + (hx.x - HEAD.x).toFixed(1) + ' ' + (hx.y - HEAD.y).toFixed(1) + ') rotate(' + tiltDeg + ' ' + HEAD.x + ' ' + HEAD.y + ')');
+    E.headG.setAttribute('transform', 'translate(' + (hx.x - HEAD.x).toFixed(1) + ' ' + (hx.y - HEAD.y).toFixed(1) + ') rotate(' + tiltDeg + ' 60 60)');
     /* Neck is drawn in root coordinates from the live shoulder/chest anchor to
        the head's bottom edge, so springy head lag never detaches it. */
     if (E.neck) {
@@ -1139,7 +1131,7 @@
     /* The eyes sit on the horizontal midline of the head and the mouth below
        them. These offsets are relative to the head centre, never hard-coded,
        so adjusting HEAD.y can never again strand the face outside the head. */
-    var eyeY = HEAD.y - 0.5 + py, eyeL = HEAD.x - EYE_DX + px, eyeR = HEAD.x + EYE_DX + px;
+    var eyeY = HEAD.y - 0.5 + py, eyeL = HEAD.x - 5 + px, eyeR = HEAD.x + 5 + px;
     E.pupL.setAttribute('cx', eyeL.toFixed(1)); E.pupL.setAttribute('cy', eyeY.toFixed(1));
     E.pupR.setAttribute('cx', eyeR.toFixed(1)); E.pupR.setAttribute('cy', eyeY.toFixed(1));
     var lidY = eyeY.toFixed(1);
@@ -1156,9 +1148,9 @@
     }
     /* mouth: smile <-> frown morph + open (surprise/yawn) */
     var sm = clamp(F.smile, -1, 1);
-    var mouthY = HEAD.y + MOUTH_DY + F.gaze.y * 2;
-    E.mouth.setAttribute('d', 'M' + (HEAD.x - MOUTH_W) + ' ' + mouthY.toFixed(1) +
-      ' Q' + HEAD.x + ' ' + (mouthY + sm * MOUTH_CURVE).toFixed(1) + ' ' + (HEAD.x + MOUTH_W) + ' ' + mouthY.toFixed(1));
+    var mouthY = HEAD.y + 8 + F.gaze.y * 2;
+    E.mouth.setAttribute('d', 'M' + (HEAD.x - 5) + ' ' + mouthY.toFixed(1) +
+      ' Q' + HEAD.x + ' ' + (mouthY + sm * 4.2).toFixed(1) + ' ' + (HEAD.x + 5) + ' ' + mouthY.toFixed(1));
     E.mouth.setAttribute('opacity', (0.9 * (1 - F.mouthOpen)).toFixed(2));
     E.mouthOpen.setAttribute('opacity', (F.mouthOpen * 0.95).toFixed(2));
     E.mouthOpen.setAttribute('cy', (mouthY + 1.5).toFixed(1));
