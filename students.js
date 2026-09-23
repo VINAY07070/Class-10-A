@@ -46,6 +46,15 @@
   };
   function highlightRole(name) { return HIGHLIGHTS[String(name).toUpperCase()] || ''; }
 
+  /* Badge text for the two admins. NITIN keeps full admin rights; only the
+     label changes. The wide variant gets its own class so the longer text
+     stays inside a 2-column card on small phones. */
+  var ROLE_BADGES = {
+    'VINAY KHILERI': { text: 'FOUNDER', wide: false },
+    'NITIN': { text: 'ADMIN • CO-FOUNDER', wide: true }
+  };
+  function roleBadge(name) { return ROLE_BADGES[String(name).toUpperCase()] || null; }
+
   function render(searchTerm) {
     var query = (searchTerm || '').trim();
     var filtered = students.filter(function (s) {
@@ -56,6 +65,7 @@
       var hasProfile = !!profile;
       var initials = name.split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2);
       var role = highlightRole(name);
+      var badge = roleBadge(name);
       var isFounder = String(name).toUpperCase() === 'VINAY KHILERI';
       var num = students.indexOf(name) + 1;
       var grad = AVATAR_GRADIENTS[num % AVATAR_GRADIENTS.length];
@@ -63,7 +73,8 @@
         (role ? ' student-' + role + (isFounder ? ' student-founder' : '') : '') +
         '" data-name="' + name + '" tabindex="0" role="button"' +
         ' style="animation-delay:' + (i * 0.025) + 's">' +
-        (role ? '<span class="admin-badge">' + (isFounder ? 'FOUNDER' : 'ADMIN') + '</span>' : '') +
+        (badge ? '<span class="admin-badge' + (badge.wide ? ' admin-badge-wide' : '') + '">' +
+          badge.text + '</span>' : '') +
         '<div class="student-avatar" style="background:' + grad + '">' + initials + '</div>' +
         '<div class="student-name">' + highlight(name, query) + '</div>' +
         '<div class="student-number">#' + num + (hasProfile ? ' •  Profile' : '') + '</div>' +
@@ -108,7 +119,7 @@
     html += '<div class="modal-avatar" style="background:' + grad + '">' + initials + '</div>';
     html += '<div><h2 class="heading-md">' + name + '</h2>';
     html += '<div class="text-muted" style="font-size:0.85rem">Student #' + num +
-      (isAdmin ? ' • 👑 Class Admin' : (isCoAdmin ? ' • 👑 Admin' : '')) + '</div>';
+      (isAdmin ? ' • 👑 Class Admin' : (isCoAdmin ? ' • 👑 Admin • CO-FOUNDER' : '')) + '</div>';
     html += '</div></div>';
 
     if (!profile) {

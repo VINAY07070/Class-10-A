@@ -3509,3 +3509,22 @@ html.perf-quiet .sm-bubble {
 .visit-week { background: rgba(245,181,68,.12); border: 1px solid rgba(245,181,68,.35); color: var(--gold-2); }
 .visit-older { background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--text-muted); }
 .visit-never { background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.35); color: #fca5a5; }
+
+/* ---------- wide admin badge (NITIN: ADMIN • CO-FOUNDER) ----------
+   The label is much longer than FOUNDER/ADMIN, and mobile.css raises
+   .admin-badge to 12px while the grid drops to two columns. Letter spacing
+   and padding are trimmed just enough to keep it on one line inside
+   .student-card, which clips overflow with the card's 18px radius. */
+.admin-badge-wide {
+  letter-spacing: .04em;
+  padding: 3px 7px;
+  white-space: nowrap;
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 760px) {
+  /* mobile.css also targets .admin-badge and loads later in the cascade, so
+     this is qualified by the card to win on specificity rather than order. */
+  .student-card .admin-badge-wide { font-size: 9px; letter-spacing: .01em; padding: 3px 6px; }
+}
