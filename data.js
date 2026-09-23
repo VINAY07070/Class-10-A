@@ -24,6 +24,7 @@ var DataStore = (function () {
     session: 'aia_session',
     classChat: 'aia_class_chat',
     classChatDeleted: 'aia_class_chat_deleted',
+    classChatCleared: 'aia_class_chat_cleared',
     files: 'aia_files',
     pyqs: 'aia_pyqs',
     blocks: 'aia_blocks',
@@ -340,11 +341,56 @@ var DataStore = (function () {
 
   /* ---------- class chat ---------- */
   /* Applies the shared "deleted message ids" tombstone list, so a message
-     deleted on one device disappears for the class instead of syncing back. */
+     deleted on one device disappears for the class instead of syncing back.
+     It also applies the class-wide clear marker (see below). */
   function _applyChatTombstones(list) {
     var dead = _get(KEYS.classChatDeleted, []);
-    if (!Array.isArray(dead) || !dead.length) return list;
-    return (list || []).filter(function (m) { return !m || !m.id || dead.indexOf(m.id) === -1; });
+    var marker = _chatClearGet();
+    if ((!Array.isArray(dead) || !dead.length) && !marker) return list;
+    return (list || []).filter(function (m) {
+      if (!m) return false;
+      if (marker && _chatMsgCleared(m, marker)) return false;
+      return !(m.id && Array.isArray(dead) && dead.indexOf(m.id) !== -1);
+    });
+  }
+  /* When the admin clears the chat, EVERY message that existed then must
+     vanish — on every device, including one that was offline and only gets
+     the old list later, and including copies sitting in the public relay's
+     history. Tombstoning just the ids the admin happens to hold is not
+     enough: a message the admin's device never received has no tombstone and
+     comes straight back.
+     So a clear also stamps a class-wide marker. A message is hidden when it
+     was stamped with an older marker, or (for messages written before this
+     existed) when its timestamp is at or before the marker. New messages are
+     stamped with the marker they were sent under, which makes the rule
+     independent of clock differences between phones. */
+  function _chatClearGet() {
+    var t = _get(KEYS.classChatCleared, 0);
+    return typeof t === 'number' && t > 0 ? t : 0;
+  }
+  function _chatClearSet(t) {
+    t = (typeof t === 'number' && t > 0) ? t : 0;
+    var cur = _chatClearGet();
+    if (t <= cur) return cur;              /* the marker only ever moves forward */
+    _set(KEYS.classChatCleared, t);
+    var raw = _get(KEYS.classChat, []);
+    if (Array.isArray(raw) && raw.length) {
+      var kept = raw.filter(function (m) { return !(m && _chatMsgCleared(m, t)); });
+      if (kept.length !== raw.length) _set(KEYS.classChat, kept);
+    }
+    return t;
+  }
+  function _chatMsgCleared(m, marker) {
+    if (!m || !marker) return false;
+    var cw = m.cw;
+    if (typeof cw === 'number') return cw < marker;
+    var t = _msgTime(m);
+    return t > 0 && t <= marker;           /* legacy message, no clear stamp */
+  }
+  function _msgTime(m) {
+    var t = m && (m.at || m.created_at || m.date);
+    var n = t ? new Date(t).getTime() : 0;
+    return isNaN(n) ? 0 : n;
   }
   function _markChatDeleted(ids) {
     var dead = _get(KEYS.classChatDeleted, []);
@@ -354,8 +400,11 @@ var DataStore = (function () {
   }
   function getClassChat() { return _applyChatTombstones(_get(KEYS.classChat, [])); }
   function addClassChat(msg) {
+    if (!msg) msg = {};
     if (!msg.id) msg.id = _uid('msg');
     if (!msg.at) msg.at = new Date().toISOString();
+    /* Stamp the clear marker in force when this message was written. */
+    if (msg.cw === undefined) msg.cw = _chatClearGet();
     var l = _get(KEYS.classChat, []).filter(function (m) { return m && m.id !== msg.id; });
     l.push(msg);
     if (l.length > 500) l = l.slice(-500);
@@ -388,6 +437,14 @@ var DataStore = (function () {
     });
     _markChatDeleted(gone);
     setClassChat(keep);
+    /* A full clear (no keep-list) also raises the class-wide marker, so old
+       messages still held by another device or by the relay history cannot
+       come back. "Clear mine" only removes this user's own messages, so it
+       must not touch the marker. */
+    if (!keepIds) {
+      setClassChat([]);
+      _chatClearSet(Date.now());
+    }
     return gone.length;
   }
 
@@ -962,6 +1019,7 @@ var DataStore = (function () {
     findCredentialsByName: findCredentialsByName, authenticate: authenticate, resetPassword: resetPassword,
     getClassChat: getClassChat, addClassChat: addClassChat, setClassChat: setClassChat,
     deleteClassChat: deleteClassChat, deleteClassChatById: deleteClassChatById, clearClassChat: clearClassChat,
+    chatClearGet: _chatClearGet, chatClearSet: _chatClearSet, chatMsgCleared: _chatMsgCleared,
     getAiHistory: getAiHistory, addAiMessage: addAiMessage, clearAiHistory: clearAiHistory,
     getAiLog: getAiLog, clearAiLog: clearAiLog,
     getActivityLog: getActivityLog, logActivity: logActivity, logAction: logAction,

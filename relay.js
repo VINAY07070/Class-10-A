@@ -80,7 +80,7 @@
     aia_pyqs: 'pq', aia_blocks: 'bk',
     aia_presence: 'pr', aia_ai_log: 'ag', aia_chat_mode: 'cm2',
     aia_files: 'fl', aia_credentials_overrides: 'co',
-    aia_class_chat_deleted: 'cd', aia_activity_log: 'al',
+    aia_class_chat_deleted: 'cd', aia_class_chat_cleared: 'cw', aia_activity_log: 'al',
     aia_tombstones: 'tb', aia_ai_shared: 'as', aia_theme_plain: 'tp'
   };
   var LONG = {};
@@ -643,7 +643,7 @@
        140ms is enough to make the sender wait for the next poll, which is
        the "it only shows after a refresh" report. Chat goes out at once;
        everything else stays batched so a burst of edits is one post. */
-    if (key === 'aia_class_chat' || key === 'aia_class_chat_deleted') {
+    if (key === 'aia_class_chat' || key === 'aia_class_chat_deleted' || key === 'aia_class_chat_cleared') {
       var keys = Object.keys(dirty); dirty = {};
       publish(keys);
       return;

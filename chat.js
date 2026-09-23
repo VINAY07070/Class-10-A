@@ -204,19 +204,23 @@
 
   /* ---------- render ---------- */
   function esc(s) { return App.escapeHtml(s); }
-  /* Announce an admin clear to the whole class. Publishes the empty list and
-     the deleted-id list together, and force-sends them so the message cannot
-     be sitting in a debounce window when the admin closes the tab. */
+  /* Announce an admin clear to the whole class. Publishes the empty list,
+     the deleted-id list and the class-wide clear marker together, and
+     force-sends them so the message cannot be sitting in a debounce window
+     when the admin closes the tab. The marker is what makes the clear stick
+     on a device that was offline: it outranks any older copy of the list,
+     so the messages cannot be merged back in. */
   function broadcastClear() {
     if (!window.AiaRelay || !window.AiaRelay.sendNow) return;
     var dead = [];
     try { dead = JSON.parse(localStorage.getItem('aia_class_chat_deleted') || '[]') || []; } catch (e) {}
+    var marker = (window.DataStore && DataStore.chatClearGet) ? DataStore.chatClearGet() : 0;
     var payload = {
       a: 'a10a',
       f: (window.AiaSync && window.AiaSync.device && window.AiaSync.device.id) || 'admin',
       n: (window.AiaSync && window.AiaSync.device && window.AiaSync.device.name) || 'Admin',
       q: 'clear',
-      d: { cc: '[]', cd: JSON.stringify(dead) }
+      d: { cc: '[]', cd: JSON.stringify(dead), cw: JSON.stringify(marker) }
     };
     window.AiaRelay.sendNow(payload);
   }

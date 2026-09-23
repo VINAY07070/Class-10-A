@@ -81,6 +81,11 @@
   def('aia_test_scores', UNION, 600);
   def('aia_class_chat', UNION, 500);
   def('aia_class_chat_deleted', UNION, 600);
+  /* The class-wide chat clear marker. It is a single timestamp that only
+     ever moves forward, so a clear made on one device outranks any older
+     one, and a stale copy can never un-clear the chat. */
+  def('aia_class_chat_cleared', LWW);
+  var CHAT_CLEAR_KEY = 'aia_class_chat_cleared';
   /* aia_ai_log is intentionally absent: it holds AI conversations, which
      stay on the device that had them. */
   def('aia_activity_log', UNION, 400);
@@ -229,6 +234,14 @@
     if (remoteV === undefined) return { value: localV, changed: false, added: 0 };
     if (localV === undefined) return { value: remoteV, changed: true, added: 1 };
     var kind = kindOf(key), cap = SYNC_DEFS[key] ? SYNC_DEFS[key].cap : 80;
+    if (key === CHAT_CLEAR_KEY) {
+      /* A clear marker is a high-water mark: take the larger value, so an
+         older clear can never arrive late and un-clear the chat. */
+      var la = Number(localV) || 0, ra = Number(remoteV) || 0;
+      if (ra > la) return { value: ra, changed: true, added: 1 };
+      if (la > ra) return { value: la, changed: false, added: 0 };
+      return { value: localV, changed: false, added: 0 };
+    }
     if (kind === LWW) {
       var a = JSON.stringify(localV), b = JSON.stringify(remoteV);
       if (a === b) return { value: localV, changed: false, added: 0 };
@@ -254,6 +267,13 @@
         if (Array.isArray(dead) && dead.length) {
           var filtered = r.value.filter(function (m) { return !m || !m.id || dead.indexOf(m.id) === -1; });
           if (filtered.length !== r.value.length) { r.value = filtered; r.changed = true; }
+        }
+        /* A class-wide clear also wins over any list copy, however late it
+           arrives, so the cleared messages cannot be merged back in. */
+        var marker = SYNC_DEFS[CHAT_CLEAR_KEY] ? readKey(CHAT_CLEAR_KEY) : 0;
+        if (marker) {
+          var cut = r.value.filter(function (m) { return !window.DataStore.chatMsgCleared(m, marker); });
+          if (cut.length !== r.value.length) { r.value = cut; r.changed = true; }
         }
       }
       return r;
@@ -348,6 +368,11 @@
      "this was deleted" still takes effect here. */
   function sweepTombstones() {
     var touched = 0;
+    /* Keep the chat purge current even if only the marker moved. */
+    if (window.DataStore && window.DataStore.chatClearGet && window.DataStore.chatClearSet) {
+      var mk = window.DataStore.chatClearGet();
+      if (mk) { window.DataStore.chatClearSet(mk); }
+    }
     Object.keys(SYNC_DEFS).forEach(function (k) {
       if (!tombstoneIds(k).length) return;
       var kind = kindOf(k);
@@ -397,7 +422,13 @@
     if (!isSyncedKey(key)) return 0;
     var m = mergeValues(key, localForMerge(key), remoteV);
     if (!m.changed) return 0;
-    writeKey(key, m.value);
+    /* A clear marker arriving from a peer must also purge the messages it
+       covers on this device, exactly as a local clear would. */
+    if (key === CHAT_CLEAR_KEY && window.DataStore && window.DataStore.chatClearSet) {
+      window.DataStore.chatClearSet(Number(m.value) || 0);
+    } else {
+      writeKey(key, m.value);
+    }
     meta[key] = { rev: (meta[key] && meta[key].rev || 0) + 1, at: Date.now(), by: from || 'remote' };
     saveMeta();
     lastSyncAt = Date.now(); lastSyncInfo = 'merged ' + (m.added || 1) + ' update(s) from ' + (from || 'peer');
@@ -622,7 +653,7 @@
   var serverMode = false, serverTimer = null, pushTimer = null, serverFails = 0;
   var serverOptIn = false;
   try { serverOptIn = window.AIA_SERVER_HUB === true; } catch (e) { serverOptIn = false; }
-  var TO_SHORT = { aia_students: 'students', aia_student_profiles: 'student_profiles', aia_teachers: 'teachers', aia_leadership: 'leadership', aia_homework: 'homework', aia_announcements: 'announcements', aia_polls: 'polls', aia_test_scores: 'test_scores', aia_class_chat: 'class_chat', aia_comments: 'comments', aia_poll_votes: 'poll_votes', aia_subject_content: 'subject_content', aia_subject_photos: 'subject_photos', aia_ai_config: 'ai_config', aia_theme: 'theme', aia_activity_log: 'activity_log', aia_tombstones: 'tombstones', aia_ai_shared: 'ai_shared' };
+  var TO_SHORT = { aia_students: 'students', aia_student_profiles: 'student_profiles', aia_teachers: 'teachers', aia_leadership: 'leadership', aia_homework: 'homework', aia_announcements: 'announcements', aia_polls: 'polls', aia_test_scores: 'test_scores', aia_class_chat: 'class_chat', aia_class_chat_deleted: 'class_chat_deleted', aia_class_chat_cleared: 'class_chat_cleared', aia_comments: 'comments', aia_poll_votes: 'poll_votes', aia_subject_content: 'subject_content', aia_subject_photos: 'subject_photos', aia_ai_config: 'ai_config', aia_theme: 'theme', aia_activity_log: 'activity_log', aia_tombstones: 'tombstones', aia_ai_shared: 'ai_shared' };
   var TO_LONG = {}; Object.keys(TO_SHORT).forEach(function (k) { TO_LONG[TO_SHORT[k]] = k; });
   function serverPull() {
     fetch('/api/state', { credentials: 'include', cache: 'no-store' }).then(function (r) {
