@@ -162,11 +162,37 @@
       return 'Hello, ' + USER.name + '! 👋 I\'m Class AI. Ask me about teachers, homework, scores, students, subjects — or start a quiz!';
     }
     if (q.indexOf('who are you') !== -1 || q.indexOf('what are you') !== -1) {
-      return 'I\'m **Class AI** 🤖 — the AIA Class 10-A study companion. I know our students, teachers, homework, scores, subjects and announcements. I can also quiz you!';
+      return 'I\'m **Class AI** 🤖 — the AIA Class 10-A study companion. I can answer general study questions and I know our students, teachers, homework, scores, subjects and announcements. I can also quiz you!';
     }
-    return 'Good question! 🤔 I\'m best with things like:\n\n' +
+    /* Small built-in general-knowledge set so the offline brain still answers
+       common exam questions instead of refusing. This is a fallback only: the
+       admin's API brain answers anything, so keep it short and factual. */
+    var g = generalAnswer(q);
+    if (g) return g;
+    return 'Here\'s a solid answer:\n\nThat one is a general study question rather than something stored on this site, so I can\'t look it up in the class data. Try me on:\n\n' +
       '• "Who teaches Maths?"\n• "What homework is due?"\n• "Tell me about RUDRA"\n• "Start a quiz"\n• "What are the subject notes?"\n\n' +
-      'Or ask our **smart API brain** (if the admin enabled it) for anything at all!';
+      'For open-ended questions, ask the admin to switch on the **smart API brain** — it answers anything. 📚';
+  }
+
+  /* Built-in answers for common Class 10 general questions. Deliberately
+     small and factual — the API brain handles everything else. */
+  function generalAnswer(q) {
+    var F = [
+      [/pythagoras|hypotenuse/, 'Pythagoras theorem 📐\n\nIn a right triangle: **a² + b² = c²**, where c is the hypotenuse.\n\nExample: legs 3 and 4 → c² = 9 + 16 = 25 → **c = 5**.'],
+      [/quadratic formula/, 'Quadratic formula ✏️\n\nFor **ax² + bx + c = 0**:\n\n**x = (−b ± √(b² − 4ac)) / 2a**\n\nThe part b² − 4ac is the *discriminant*: positive = 2 real roots, zero = 1, negative = no real roots.'],
+      [/newton.{0,12}(second|2nd) law|f\s*=\s*ma/, 'Newton\'s Second Law ⚙️\n\n**F = m × a** — force equals mass times acceleration.\n\nA bigger force gives more acceleration; a heavier object accelerates less.'],
+      [/photosynthesis/, 'Photosynthesis is how plants make food! 🌱\n\n• Plants take in **carbon dioxide** (CO₂) from air and **water** from soil\n• Sunlight + chlorophyll (green pigment) power the reaction\n• They produce **glucose** (food) and release **oxygen**\n\nEquation: 6CO₂ + 6H₂O →(light)→ C₆H₁₂O₆ + 6O₂'],
+      [/ohm.{0,12}law|v\s*=\s*ir/, 'Ohm\'s Law ⚡\n\n**V = I × R** — voltage equals current times resistance.\n\nSo I = V/R and R = V/I.'],
+      [/mole concept|avogadro/, 'Mole concept 🧪\n\nOne mole = **6.022 × 10²³** particles (Avogadro\'s number).\n\nMoles = mass ÷ molar mass.'],
+      [/study tip|how to study|advice/, 'Study tips for 10-A 📚\n\n' +
+        '1. Study in **25-min focus sprints**, then 5-min breaks\n' +
+        '2. Revise Maths formulas daily — 10 problems minimum\n' +
+        '3. Read one English chapter every week\n' +
+        '4. Use the Subject Hub notes before class tests\n' +
+        '5. Sleep well — a fresh brain scores better! 😴']
+    ];
+    for (var i = 0; i < F.length; i++) if (F[i][0].test(q)) return F[i][1];
+    return null;
   }
 
   /* ============ quiz mode ============ */
@@ -227,8 +253,9 @@
     var meta = (window.SEED && window.SEED.meta) || {};
     L.push('SITE: ' + (meta.site_name || 'AIA Class 10-A Hub'));
     L.push('SCHOOL: ' + (meta.school || '') + ' | CLASS: ' + (meta.class || '') + ' | ADMIN: ' + (meta.admin_name || ''));
-    L.push('You are answering as the class assistant inside this site. Use ONLY the facts below. If something is not listed, say you do not have it — never invent names, marks or dates.');
-    L.push('Answers must match the site data exactly. Give short, friendly, exam-focused replies.');
+    L.push('You are the friendly class assistant inside this site. You are a helpful general study assistant FIRST: answer any question a Class 10 student asks — science, maths, English, history, exam technique, general knowledge, everyday questions — using your own knowledge, in a short, clear, exam-focused way.');
+    L.push('The SITE DATA below is the single source of truth for anything about THIS class: student names, teachers, leadership, homework, scores, polls, announcements, subjects and PYQ papers. Use it exactly and never invent or guess those class-specific facts. If a class detail is genuinely not listed below, say you do not have it yet.');
+    L.push('For everything that is not a class-specific fact, you MUST answer normally from your own knowledge. Never refuse a general question, and never say you only know class data.');
 
     try {
       var teachers = DataStore.getTeachers() || [];

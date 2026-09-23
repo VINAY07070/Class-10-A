@@ -409,6 +409,13 @@ var App = (function () {
     /* lite devices hide the canvas in CSS; skip the loop entirely so we
        don't keep a rAF running against an invisible element. */
     if (window.AiaPerf && window.AiaPerf.lite) return;
+    /* loginCanvas is only on index.html and only visible while the login
+       gate is up. Once the gate is done the element is display:none, so
+       the loop would keep running against something nobody can see. */
+    if (canvasId === 'loginCanvas') {
+      var gate = document.getElementById('loginOverlay');
+      if (gate && (gate.classList.contains('done') || gate.style.display === 'none')) return;
+    }
     var ctx = canvas.getContext('2d');
     if (!ctx) return;
     var w, h, particles = [], raf = 0, running = true;

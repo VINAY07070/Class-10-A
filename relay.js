@@ -114,6 +114,52 @@
 
   var seen = {}, lastTime = 0, status = enabled ? 'starting' : 'off';
   var es = null, dirty = {}, pushTimer = 0, pollTimer = 0, reconnectTimer = 0, sseFails = 0;
+  /* -------- durable outbox --------
+     The relay is a free public service that rate-limits bursts (HTTP 429)
+     and sometimes blackholes a request. With fire-and-forget posting, a
+     message the admin cleared — or a chat line a student sent — could be
+     dropped on the floor and never reach another phone, which is exactly
+     the "it only cleared for me" and "it shows after a refresh" reports.
+     So every payload is queued in localStorage and only retired once a
+     relay acknowledges it. The queue survives a reload, and a periodic
+     sweep retries whatever is still outstanding. */
+  var OUTBOX_KEY = 'aia_relay_outbox';
+  var outbox = [];
+  try { outbox = JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]') || []; }
+  catch (e) { outbox = []; }
+  var OUTBOX_MAX = 60, OUTBOX_TTL = 86400000; /* 1 day */
+  var outboxFlushTimer = 0;
+  function saveOutbox() {
+    try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(outbox.slice(-OUTBOX_MAX))); } catch (e) {}
+  }
+  function enqueue(body, label) {
+    outbox.push({ b: body, tag: label || '', r: room, t: Date.now(), tries: 0 });
+    if (outbox.length > OUTBOX_MAX) outbox = outbox.slice(-OUTBOX_MAX);
+    saveOutbox();
+    flushOutbox();
+  }
+  /* Send everything still awaiting an acknowledgement, oldest first, so a
+     "clear all" can never overtake the messages it is meant to remove. */
+  function flushOutbox() {
+    if (!enabled || !outbox.length) return;
+    clearTimeout(outboxFlushTimer);
+    var now = Date.now();
+    var pending = outbox.filter(function (it) { return now - it.t < OUTBOX_TTL && (!it.r || it.r === room); });
+    if (pending.length !== outbox.length) { outbox = pending; saveOutbox(); }
+    outbox.forEach(function (item) {
+      if (item.busy) return;
+      item.busy = true; item.tries++;
+      post(item.b, function () {
+        item.busy = false;
+        var i = outbox.indexOf(item);
+        if (i !== -1) { outbox.splice(i, 1); saveOutbox(); }
+      }, function () {
+        item.busy = false;
+      });
+    });
+    /* Anything that failed stays queued; try again shortly. */
+    if (outbox.length) outboxFlushTimer = setTimeout(flushOutbox, 4000);
+  }
   var lastPublishKey = {}, publishedChatIds = {};
   /* Catch-up cursor. Captured at module load, before the live stream can
      touch lastTime, so the first sync really does replay recent history. */
@@ -189,7 +235,9 @@
       payloadBytes += size;
     });
     flush();
-    queue.forEach(post);
+    /* Queued rather than posted directly: if the relay rate-limits or is
+       briefly unreachable the payload is retried instead of being lost. */
+    queue.forEach(function (body) { enqueue(body, 'delta'); });
   }
 
   /* -------- full-state beacon --------
@@ -227,7 +275,7 @@
     });
     flushChunk();
     parts.forEach(function (part) {
-      post(JSON.stringify({ a: 'a10a', f: device.id, n: device.name, q: 'state', d: part }));
+      enqueue(JSON.stringify({ a: 'a10a', f: device.id, n: device.name, q: 'state', d: part }), 'state');
     });
   }
   /* Only one device needs to answer, and it should not answer every join.
@@ -333,7 +381,7 @@
     return out;
   }
 
-  function post(body) {
+  function post(body, onOk, onFail) {
     var anyOk = false;
     var preferred = serverIdx;
     var order = [preferred];
@@ -351,10 +399,11 @@
           /* The preferred relay is the first in `order`, so a healthy answer
              from it can be trusted as this device's primary host. */
           if (n === 0) serverIdx = idx;
+          if (onOk) { try { onOk(); } catch (e) {} }
         }).catch(function () {}).then(function () {
-          if (n === order.length - 1 && !anyOk) fails();
+          if (n === order.length - 1 && !anyOk) { fails(); if (onFail) { try { onFail(); } catch (e) {} } }
         });
-      } catch (e) { if (n === order.length - 1 && !anyOk) fails(); }
+      } catch (e) { if (n === order.length - 1 && !anyOk) { fails(); if (onFail) { try { onFail(); } catch (e) {} } } }
     });
   }
   function fails() { sseFails++; if (sseFails >= 3) setStatus('error', 'Relay unreachable — local sync unaffected'); }
@@ -445,6 +494,7 @@
       rememberHost(SERVERS.indexOf(base()));
       setStatus('live');
       setPolling(30000);                  /* SSE healthy → occasional safety poll */
+      flushOutbox();                      /* retire anything queued while offline */
       sayHello();                         /* ask whoever is online for the state */
       /* Reconcile anything we missed while the stream was down (or, on a
          first load, whatever was already in the room). */
@@ -589,6 +639,15 @@
     if (!key || !shortKey(key)) return;
     dirty[key] = 1;
     clearTimeout(pushTimer);
+    /* A chat message is a conversation, not a setting — batching it for
+       140ms is enough to make the sender wait for the next poll, which is
+       the "it only shows after a refresh" report. Chat goes out at once;
+       everything else stays batched so a burst of edits is one post. */
+    if (key === 'aia_class_chat' || key === 'aia_class_chat_deleted') {
+      var keys = Object.keys(dirty); dirty = {};
+      publish(keys);
+      return;
+    }
     pushTimer = setTimeout(function () {
       var keys = Object.keys(dirty);
       dirty = {};
@@ -602,6 +661,7 @@
       setStatus('starting');
       connect();
       setPolling(5000);                   /* reliable poll until SSE is healthy */
+      setTimeout(flushOutbox, 600);       /* send anything queued in a past session */
       setTimeout(function () { catchUp(); }, 400);   /* replay history as early as possible */
       /* Also ask live peers for their state: covers the case where this
          device was away long enough for the relay history to have expired. */
@@ -621,6 +681,9 @@
       if (!r) return false;
       room = r; saveSettings();
       lastTime = 0; seen = {};
+      /* Queued payloads belong to the old room; sending them into the new one
+         would leak one class's chat into another's. */
+      outbox = []; saveOutbox(); clearTimeout(outboxFlushTimer);
       /* a new room is a fresh history: force a full catch-up again */
       bootSince = CATCHUP_WINDOW; catchupDone = false;
       try { localStorage.removeItem(LAST_SEEN_KEY); } catch (e) {}
@@ -638,6 +701,16 @@
       return enabled;
     },
     isEnabled: function () { return enabled; },
+    /* Send a payload straight into the durable queue. Used by the chat UI as
+       a belt-and-braces path so an admin "clear all" reaches the room even
+       if the storage event that normally triggers a publish was missed. */
+    sendNow: function (obj) {
+      if (!enabled) return false;
+      try { enqueue(JSON.stringify(obj), 'direct'); } catch (e) { return false; }
+      return true;
+    },
+    pending: function () { return outbox.length; },
+    flush: function () { flushOutbox(); },
     statusHTML: function () { return statusHTML(status === 'live' ? '' : 'Sync codes still work even without the live link.'); },
     refresh: function () { catchingUp = false; catchUp(false); },
     /* Force a full-history replay (used by the Sync Center "re-sync" action). */

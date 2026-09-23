@@ -204,6 +204,22 @@
 
   /* ---------- render ---------- */
   function esc(s) { return App.escapeHtml(s); }
+  /* Announce an admin clear to the whole class. Publishes the empty list and
+     the deleted-id list together, and force-sends them so the message cannot
+     be sitting in a debounce window when the admin closes the tab. */
+  function broadcastClear() {
+    if (!window.AiaRelay || !window.AiaRelay.sendNow) return;
+    var dead = [];
+    try { dead = JSON.parse(localStorage.getItem('aia_class_chat_deleted') || '[]') || []; } catch (e) {}
+    var payload = {
+      a: 'a10a',
+      f: (window.AiaSync && window.AiaSync.device && window.AiaSync.device.id) || 'admin',
+      n: (window.AiaSync && window.AiaSync.device && window.AiaSync.device.name) || 'Admin',
+      q: 'clear',
+      d: { cc: '[]', cd: JSON.stringify(dead) }
+    };
+    window.AiaRelay.sendNow(payload);
+  }
   function dayLabel(iso) {
     var d = new Date(iso), now = new Date();
     var dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -427,7 +443,10 @@
       if (!session || session.role !== 'admin') return;
       if (!confirm('ADMIN: delete ALL chat messages for everyone?')) return;
       DataStore.clearClassChat(null);
-      App.showToast('Chat cleared', 'info');
+      /* Mark the clear as an explicit instruction so a peer holding an old
+         copy cannot merge the messages back in on its next sync. */
+      broadcastClear();
+      App.showToast('Chat cleared for everyone', 'info');
       renderMessages(false);
     });
   }

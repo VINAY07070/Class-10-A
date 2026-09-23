@@ -108,6 +108,26 @@
   animation: none !important;
 }
 
+/* The login gate is the FIRST screen a phone shows, and every one of these
+   loops runs forever behind the form — a shimmering background-clip text, a
+   glowing badge and several SVG waves, each repainting every frame. That is
+   the biggest sustained cost on a low-end phone, so on lite devices they
+   settle into their still state. Desktop keeps the full animation. */
+.perf-lite .login-badge-glow,
+.perf-lite .login-logo,
+.perf-lite .login-class,
+.perf-lite .login-mascot,
+.perf-lite .login-mascot g,
+.perf-lite .login-mascot .lm-arm,
+.perf-lite .signature-ring {
+  animation: none !important;
+}
+.perf-lite .login-class,
+.perf-lite .signature-text {
+  background-position: 0 0 !important;
+}
+.perf-lite .login-badge-glow { opacity: .5 !important; }
+
 /* hover-only flourishes never fire on touch anyway */
 .perf-lite .sun-rays,
 .perf-lite .hero-shine { display: none; }
