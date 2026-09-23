@@ -238,3 +238,19 @@ already taken by the base theme and `polish.css`. Use a real element (see
 new animation gated behind it: `html.perf-lite .thing { animation: none; }`
 or an early return in JS (`P.lite`). The phone target is 60fps on every page
 and no horizontal overflow.
+
+## Admin panel: Last Visits
+
+`panel-visits` (tab `data-tab="visits"`) is the single home for visit data.
+It renders `DataStore.getLastVisits()`; the old per-user stats table that used
+to live inside the Users section was removed so the two do not drift. Users is
+now credentials only (login, copy, reset password).
+
+`getLastVisits()` keys rows by student NAME, not username. Auto-generated
+logins (`AAY941`) and live presence keys (`aayan`) are the same person, so
+keying by username produced duplicate rows. Match presence and stats onto the
+roster by `nameKey(name)` first, then fall back to username.
+
+Controls are bound once in `bindVisitsControls()` and guarded with a
+`data-bound` attribute: `renderVisits()` re-runs on the 8s live tick, so
+re-binding there would stack duplicate listeners.
