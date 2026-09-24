@@ -208,6 +208,17 @@
   }
 
   /* -------- publishing -------- */
+  /* Ephemeral typing presence is intentionally not stored in localStorage. Each
+     heartbeat is forwarded as a tiny relay message so different phones can
+     see it in real time. */
+  document.addEventListener('aia-typing-out', function (e) {
+    var m = e.detail || {};
+    if (!enabled || !m.user || !m.from || m.from === device.id) return;
+    enqueue(JSON.stringify({ a: 'a10a', f: device.id, n: device.name, q: 'typing', d: {
+      u: String(m.user), n: String(m.name || 'Someone'), a: m.active !== false ? 1 : 0
+    }}), 'typing');
+  });
+
   function publish(keys) {
     if (!enabled || !keys.length) return;
     /* Chunk by size so a single post never exceeds the relay limit. */
@@ -418,6 +429,12 @@
        has it answers, so a phone opening the site gets everything at once
        even if the relay's own history has already expired. */
     if (msg.q === 'hello') { maybeAnswerHello(); return; }
+    if (msg.q === 'typing') {
+      try { document.dispatchEvent(new CustomEvent('aia-typing', { detail: {
+        t: 'typing', user: msg.d.u, name: msg.d.n || 'Someone', active: !!msg.d.a, from: msg.f
+      }})); } catch (e) {}
+      return;
+    }
     if (!window.AiaSync || !msg.d) return;
     var data = {};
     Object.keys(msg.d).forEach(function (sk) {
