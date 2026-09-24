@@ -12,7 +12,7 @@ const port = Number(process.env.PORT || 10000);
 const dbFile = path.join(root, 'render-data.json');
 const sessions = new Map();
 const typingClients = new Set();
-function pushTyping(v) { const s='data: '+JSON.stringify(v)+'\\n\\n'; for (const r of typingClients) { try { r.write(s); } catch(e) { typingClients.delete(r); } } }
+function pushTyping(v) { const s='data: '+JSON.stringify(v)+'\n\n'; for (const r of typingClients) { try { r.write(s); } catch(e) { typingClients.delete(r); } } }
 const box = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(root, 'seed.js'), 'utf8'), box);
 const seed = box.window.SEED || {};
@@ -79,7 +79,7 @@ function serve(req,res) { let u = decodeURIComponent(new URL(req.url,'http://loc
 const server=http.createServer(async (req,res) => {
   if (req.method==='GET' && req.url==='/api/typing/events') {
     res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-store','Connection':'keep-alive'});
-    res.write(': connected\\n\\n'); typingClients.add(res); req.on('close',()=>typingClients.delete(res)); return;
+    res.write(': connected\n\n'); typingClients.add(res); req.on('close',()=>typingClients.delete(res)); return;
   }
   if (req.method==='POST' && req.url==='/api/typing') {
     try {
