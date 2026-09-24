@@ -386,7 +386,10 @@
   document.addEventListener('aia-typing', function (e) {
     var d = e.detail || {};
     if (!d.user || (session && d.user === session.username)) return;
-    typingMap[d.user] = { name: d.name || 'Someone', at: Date.now() };
+    /* false is an explicit stop signal; remove immediately instead of waiting
+       for the heartbeat timeout. */
+    if (d.active === false) delete typingMap[d.user];
+    else typingMap[d.user] = { name: d.name || 'Someone', at: Date.now() };
     renderTyping();
   });
   function renderTyping() {
