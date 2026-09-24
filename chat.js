@@ -363,6 +363,34 @@
   }
 
   /* ---------- typing indicators ---------- */
+  var typingStream = null;
+  function connectTypingStream() {
+    if (typingStream || !window.EventSource) return;
+    try {
+      typingStream = new EventSource('/api/typing/events');
+      typingStream.onmessage = function (ev) {
+        try { document.dispatchEvent(new CustomEvent('aia-typing', { detail: JSON.parse(ev.data) })); } catch (e) {}
+      };
+      typingStream.onerror = function () {
+        try { typingStream.close(); } catch (e) {}
+        typingStream = null;
+        setTimeout(connectTypingStream, 3000);
+      };
+    } catch (e) {}
+  }
+  function sendServerTyping(active) {
+    if (!session) return;
+    try {
+      fetch('/api/typing', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username:session.username,name:session.name,active:active !== false}),
+        keepalive:true
+      }).catch(function(){});
+    } catch(e) {}
+  }
+  connectTypingStream();
+
   function broadcastTyping(force) {
     if (!session || !window.AiaSync) return;
     var now = Date.now();
@@ -372,6 +400,7 @@
     if (!force && now - lastTyped < 1800) return;
     lastTyped = now;
     window.AiaSync.typing(session.username, session.name);
+    sendServerTyping(true);
   }
 
   function clearTyping() {
@@ -380,6 +409,7 @@
        AiaSync v2 treats this as a short-lived presence signal. */
     if (window.AiaSync && window.AiaSync.typing) {
       window.AiaSync.typing(session.username, session.name, false);
+      sendServerTyping(false);
     }
     lastTyped = 0;
   }
