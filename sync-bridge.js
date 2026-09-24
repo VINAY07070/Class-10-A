@@ -631,7 +631,8 @@
   }
   function p2pHandle(m) {
     if (!m) return;
-    if (m.t === 'update' && m.key) applyRemote(m.key, m.value, 'P2P partner');
+    if (m.t === 'typing') { try { document.dispatchEvent(new CustomEvent('aia-typing', { detail: m })); } catch (e) {} }
+    else if (m.t === 'update' && m.key) applyRemote(m.key, m.value, 'P2P partner');
     else if (m.t === 'state' && m.snap) {
       var r = mergeSnapshot(m.snap);
       toast('P2P sync: +' + r.added + ' update(s) ⚡', 'success');
@@ -897,7 +898,14 @@
     exportCode: function (full) { return encodeSnap(snapshot(full ? { photos: true, ai: true, activity: true } : { photos: false, ai: false, activity: false })); },
     importCode: function (s) { var snap = decodeSnap(s); return snap ? mergeSnapshot(snap) : null; },
     peers: function () { return Object.keys(peers).length; },
-    typing: function (user, name) { bcPost({ t: 'typing', user: user, name: name, from: device.id }); p2pBroadcast({ t: 'typing', user: user, name: name, from: device.id }); },
+    typing: function (user, name, active) {
+      var msg = { t: 'typing', user: user, name: name, active: active !== false, from: device.id };
+      bcPost(msg); p2pBroadcast(msg);
+      /* relay.js loads immediately after this bridge; dispatching an event here
+         lets the relay carry ephemeral typing presence without polluting synced
+         localStorage keys. */
+      try { document.dispatchEvent(new CustomEvent('aia-typing-out', { detail: msg })); } catch (e) {}
+    },
     /* Deletions. Anything removed locally must be announced, otherwise the
        next device to sync re-adds it from its own stale copy. */
     markDeleted: markDeleted,
