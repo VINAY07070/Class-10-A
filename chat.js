@@ -407,10 +407,8 @@
     if (!session) return;
     /* A blank/blur event should make the UI disappear quickly on peers.
        AiaSync v2 treats this as a short-lived presence signal. */
-    if (window.AiaSync && window.AiaSync.typing) {
-      window.AiaSync.typing(session.username, session.name, false);
-      sendServerTyping(false);
-    }
+    if (window.AiaSync && window.AiaSync.typing) window.AiaSync.typing(session.username, session.name, false);
+    sendServerTyping(false);
     lastTyped = 0;
   }
   document.addEventListener('aia-typing', function (e) {
