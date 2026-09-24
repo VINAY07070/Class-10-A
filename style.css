@@ -3275,14 +3275,25 @@ body.page-leaving { opacity: 0; transition: opacity .18s ease; }
 .chat-del:hover { color: var(--red); }
 @media (hover: none) { .chat-del { opacity: .7; } }
 .chat-typing {
-  display: none; align-items: center; gap: 8px; padding: 6px 18px;
-  font-size: .78rem; color: var(--text-muted); min-height: 0;
+  display: none; align-items: center; gap: 9px; margin: 0 14px 8px; padding: 8px 12px;
+  min-height: 34px; box-sizing: border-box; width: fit-content; max-width: calc(100% - 28px);
+  border: 1px solid rgba(255,255,255,.10); border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255,255,255,.07), rgba(255,255,255,.025));
+  box-shadow: 0 8px 24px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.05);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  font-size: .76rem; font-weight: 600; letter-spacing: .01em; color: var(--text-muted);
+  animation: typingPillIn .2s ease-out;
 }
-.chat-typing.show { display: flex; }
-.typing-dots { display: inline-flex; gap: 4px; }
-.typing-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); animation: typingBounce 1.2s infinite; }
+.chat-typing.show { display: inline-flex; }
+.typing-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.typing-dots { display: inline-flex; gap: 4px; flex: 0 0 auto; }
+.typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px rgba(56,224,255,.55); animation: typingBounce 1.05s infinite; }
 .typing-dots span:nth-child(2) { animation-delay: .15s; }
 .typing-dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes typingPillIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 560px) {
+  .chat-typing { margin-left: 10px; margin-right: 10px; max-width: calc(100% - 20px); }
+}
 
 /* ---------- lightbox ---------- */
 .lightbox {
