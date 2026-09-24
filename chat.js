@@ -392,14 +392,14 @@
   connectTypingStream();
 
   function broadcastTyping(force) {
-    if (!session || !window.AiaSync) return;
+    if (!session) return;
     var now = Date.now();
     /* Send a lightweight heartbeat while the student is actively typing.
        This keeps the indicator alive on other phones instead of flashing
        on/off when the sync connection has normal network jitter. */
     if (!force && now - lastTyped < 1800) return;
     lastTyped = now;
-    window.AiaSync.typing(session.username, session.name);
+    if (window.AiaSync && window.AiaSync.typing) window.AiaSync.typing(session.username, session.name);
     sendServerTyping(true);
   }
 
