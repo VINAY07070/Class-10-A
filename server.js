@@ -11,6 +11,7 @@ const root = __dirname;
 const port = Number(process.env.PORT || 10000);
 const dbFile = path.join(root, 'render-data.json');
 const sessions = new Map();
+const typingClients = new Set();
 const box = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(root, 'seed.js'), 'utf8'), box);
 const seed = box.window.SEED || {};
