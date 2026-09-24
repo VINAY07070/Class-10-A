@@ -354,6 +354,7 @@
     });
     try { DataStore.logAction('chat', 'Sent a chat message', 'chat.html'); } catch (e) {}
     inputEl.value = '';
+    clearTyping();
     inputEl.focus();
     renderMessages(true);
     try {
@@ -362,12 +363,25 @@
   }
 
   /* ---------- typing indicators ---------- */
-  function broadcastTyping() {
+  function broadcastTyping(force) {
     if (!session || !window.AiaSync) return;
     var now = Date.now();
-    if (now - lastTyped < 2500) return;
+    /* Send a lightweight heartbeat while the student is actively typing.
+       This keeps the indicator alive on other phones instead of flashing
+       on/off when the sync connection has normal network jitter. */
+    if (!force && now - lastTyped < 1800) return;
     lastTyped = now;
     window.AiaSync.typing(session.username, session.name);
+  }
+
+  function clearTyping() {
+    if (!session) return;
+    /* A blank/blur event should make the UI disappear quickly on peers.
+       AiaSync v2 treats this as a short-lived presence signal. */
+    if (window.AiaSync && window.AiaSync.typing) {
+      window.AiaSync.typing(session.username, session.name, false);
+    }
+    lastTyped = 0;
   }
   document.addEventListener('aia-typing', function (e) {
     var d = e.detail || {};
@@ -379,13 +393,16 @@
     var now = Date.now();
     var names = [];
     Object.keys(typingMap).forEach(function (u) {
-      if (now - typingMap[u].at < 4000) names.push(typingMap[u].name.split(' ')[0]);
+      if (now - typingMap[u].at < 4200) names.push(typingMap[u].name.split(' ')[0]);
       else delete typingMap[u];
     });
     if (!names.length) { typingEl.innerHTML = ''; typingEl.classList.remove('show'); return; }
     typingEl.classList.add('show');
-    typingEl.innerHTML = '<span class="typing-dots"><span></span><span></span><span></span></span> ' +
-      esc(names.slice(0, 3).join(', ')) + (names.length > 3 ? ' +' + (names.length - 3) : '') + ' typing…';
+    var shown = names.slice(0, 3);
+    var label = shown.length === 1 ? shown[0] + ' is typing…' : shown.join(', ') + ' are typing…';
+    if (names.length > 3) label = shown.join(', ') + ' +' + (names.length - 3) + ' are typing…';
+    typingEl.innerHTML = '<span class="typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>' +
+      '<span class="typing-label">' + esc(label) + '</span>';
   }
   setInterval(renderTyping, 1500);
 
@@ -429,7 +446,11 @@
   }
   if (inputEl) {
     inputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
-    inputEl.addEventListener('input', broadcastTyping);
+    inputEl.addEventListener('input', function () {
+      if (inputEl.value.trim()) broadcastTyping(true);
+      else clearTyping();
+    });
+    inputEl.addEventListener('blur', clearTyping);
   }
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
